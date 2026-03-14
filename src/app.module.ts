@@ -25,7 +25,7 @@ import { User } from './users/user.entity';
             type: 'postgres',
             url: databaseUrl,
             entities: [User],
-            synchronize: !isProduction, // false trên production
+            synchronize: true, // bật đồng bộ để tự tao bảng trên Render
             ssl: isProduction ? { rejectUnauthorized: false } : false,
             logging: false,
           };
