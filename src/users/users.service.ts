@@ -14,18 +14,7 @@ export class UsersService implements OnModuleInit {
 
   // Seed dữ liệu nhóm khi khởi động (chỉ chạy nếu bảng trống)
   async onModuleInit() {
-    const count = await this.userRepository.count();
-    if (count === 0) {
-      const sampleUsers = [
-        { name: 'Trương Hoàng Gia Bảo' },
-        { name: 'Đào Đức Toàn' },
-        { name: 'Ngô Thanh Hoàng' },
-        { name: 'Trần Đình Trí' },
-        { name: 'Trần Huy Hoàng' },
-      ];
-      await this.userRepository.save(sampleUsers);
-      console.log('✅ Seeded 5 users into the database.');
-    }
+    // Seed removed: users now register via /auth/register with email + password
   }
 
   // ── READ ──────────────────────────────────────────────

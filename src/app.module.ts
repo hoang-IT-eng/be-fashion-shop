@@ -6,26 +6,26 @@ import { join } from 'path';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { UsersModule } from './users/users.module';
+import { AuthModule } from './auth/auth.module';
+import { ProductsModule } from './products/products.module';
 import { User } from './users/user.entity';
+import { Product } from './products/product.entity';
 
 @Module({
   imports: [
-    // Load .env
     ConfigModule.forRoot({ isGlobal: true }),
 
-    // PostgreSQL via TypeORM
     TypeOrmModule.forRootAsync({
       imports: [ConfigModule],
       useFactory: (cfg: ConfigService) => {
         const databaseUrl = cfg.get<string>('DATABASE_URL');
         const isProduction = cfg.get('NODE_ENV') === 'production';
         if (databaseUrl) {
-          // Render cung cấp DATABASE_URL dạng connection string
           return {
             type: 'postgres',
             url: databaseUrl,
-            entities: [User],
-            synchronize: true, // bật đồng bộ để tự tao bảng trên Render
+            entities: [User, Product],
+            synchronize: true,
             ssl: isProduction ? { rejectUnauthorized: false } : false,
             logging: false,
           };
@@ -37,7 +37,7 @@ import { User } from './users/user.entity';
           username: cfg.get('DB_USERNAME', 'postgres'),
           password: cfg.get('DB_PASSWORD', 'postgres'),
           database: cfg.get('DB_NAME', 'fashion_shop'),
-          entities: [User],
+          entities: [User, Product],
           synchronize: true,
           logging: false,
         };
@@ -45,14 +45,15 @@ import { User } from './users/user.entity';
       inject: [ConfigService],
     }),
 
-    // Serve static frontend from /public
     ServeStaticModule.forRoot({
       rootPath: join(__dirname, '..', 'public'),
       serveRoot: '/',
-      exclude: ['/api*', '/users*'],
+      exclude: ['/api*', '/users*', '/auth*'],
     }),
 
     UsersModule,
+    AuthModule,
+    ProductsModule,
   ],
   controllers: [AppController],
   providers: [AppService],
