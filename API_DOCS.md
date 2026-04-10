@@ -186,6 +186,47 @@ Cập nhật sản phẩm. Chỉ cần gửi các field muốn thay đổi.
 
 ---
 
+### POST /products/upload 🔒 (admin)
+Upload ảnh sản phẩm lên Cloudinary. Gọi trước khi tạo/cập nhật sản phẩm.
+
+**Headers:**
+```
+Authorization: Bearer <adminToken>
+Content-Type: multipart/form-data  ← browser tự set, KHÔNG set thủ công
+```
+
+**Body:** `form-data`
+| Key | Type | Mô tả |
+|-----|------|-------|
+| file | File | File ảnh (jpg, png, webp...) tối đa 5MB |
+
+**Response 200:**
+```json
+{
+  "url": "https://res.cloudinary.com/your-cloud/image/upload/v123/fashion-shop/abc.jpg",
+  "publicId": "fashion-shop/abc"
+}
+```
+
+**Errors:** `400` không có file | `400` không phải file ảnh | `401` | `403`
+
+**Ví dụ JavaScript:**
+```javascript
+const formData = new FormData();
+formData.append('file', fileInput.files[0]); // input type="file"
+
+const res = await fetch(`${BASE_URL}/products/upload`, {
+  method: 'POST',
+  headers: { 'Authorization': `Bearer ${token}` },
+  // KHÔNG set Content-Type — browser tự xử lý multipart
+  body: formData,
+});
+const { url } = await res.json();
+// Dùng url này cho field imageUrl khi tạo sản phẩm
+```
+
+---
+
 ### DELETE /products/:id 🔒 (admin)
 Xóa sản phẩm.
 
@@ -274,3 +315,40 @@ Tất cả lỗi đều trả về format chuẩn NestJS:
 3. Token hết hạn sau **7 ngày**, cần login lại.
 4. `price` trả về dạng string decimal (ví dụ `"199000.00"`) — parse sang number khi hiển thị.
 5. `sizes` và `colors` là mảng string, có thể `null` nếu không có.
+
+## Upload ảnh — Workflow đầy đủ
+
+```
+Bước 1: User chọn file từ máy (input type="file")
+Bước 2: Gọi POST /products/upload → nhận về { url, publicId }
+Bước 3: Dùng url đó điền vào field imageUrl khi gọi POST /products hoặc PUT /products/:id
+```
+
+Ví dụ tạo sản phẩm kèm ảnh:
+```javascript
+// 1. Upload ảnh
+const formData = new FormData();
+formData.append('file', fileInput.files[0]);
+const uploadRes = await fetch(`${BASE_URL}/products/upload`, {
+  method: 'POST',
+  headers: { Authorization: `Bearer ${token}` },
+  body: formData,
+});
+const { url } = await uploadRes.json();
+
+// 2. Tạo sản phẩm với imageUrl vừa nhận
+const productRes = await fetch(`${BASE_URL}/products`, {
+  method: 'POST',
+  headers: {
+    Authorization: `Bearer ${token}`,
+    'Content-Type': 'application/json',
+  },
+  body: JSON.stringify({
+    name: 'Áo thun basic',
+    price: 199000,
+    imageUrl: url,   // ← URL từ Cloudinary
+    sizes: ['S', 'M', 'L'],
+    colors: ['trắng', 'đen'],
+  }),
+});
+```
