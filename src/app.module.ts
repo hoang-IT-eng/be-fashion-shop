@@ -10,6 +10,8 @@ import { AuthModule } from './auth/auth.module';
 import { ProductsModule } from './products/products.module';
 import { User } from './users/user.entity';
 import { Product } from './products/product.entity';
+import { CartModule } from './cart/cart.module';
+import { OrdersModule } from './orders/orders.module';
 
 @Module({
   imports: [
@@ -35,7 +37,7 @@ import { Product } from './products/product.entity';
           host: cfg.get('DB_HOST', 'localhost'),
           port: parseInt(cfg.get('DB_PORT', '5432'), 10),
           username: cfg.get('DB_USERNAME', 'postgres'),
-          password: cfg.get('DB_PASSWORD', 'postgres'),
+          password: cfg.get('DB_PASSWORD', '1234'),
           database: cfg.get('DB_NAME', 'fashion_shop'),
           entities: [User, Product],
           synchronize: true,
@@ -54,6 +56,8 @@ import { Product } from './products/product.entity';
     UsersModule,
     AuthModule,
     ProductsModule,
+    CartModule,
+    OrdersModule,
   ],
   controllers: [AppController],
   providers: [AppService],
