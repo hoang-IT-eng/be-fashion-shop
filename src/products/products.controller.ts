@@ -27,6 +27,9 @@ import { Roles } from '../auth/decorators/roles.decorator';
 import { UserRole } from '../users/user.entity';
 import { CloudinaryService } from '../cloudinary/cloudinary.service';
 
+import { ApiTags, ApiConsumes, ApiBody } from '@nestjs/swagger';
+
+@ApiTags('Products')
 @Controller('products')
 export class ProductsController {
   constructor(
@@ -76,6 +79,19 @@ export class ProductsController {
   @HttpCode(HttpStatus.OK)
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(UserRole.ADMIN)
+  @ApiConsumes('multipart/form-data')
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: {
+        file: {
+          type: 'string',
+          format: 'binary',
+          description: 'File ảnh (jpg, png, webp...) tối đa 5MB',
+        },
+      },
+    },
+  })
   @UseInterceptors(
     FileInterceptor('file', {
       storage: memoryStorage(),

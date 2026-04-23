@@ -1,0 +1,116 @@
+================================================================
+FASHION SHOP - TỔNG HỢP API
+================================================================
+Base URL (local):      http://localhost:3000
+Base URL (production): https://be-fashion-shop-uvp9.onrender.com
+Swagger UI (local):    http://localhost:3000/api/docs
+================================================================
+
+
+✅ ĐÃ LÀM
+================================================================
+
+--- AUTH ---
+POST   /auth/register          Đăng ký tài khoản (gửi email xác thực)
+GET    /auth/verify-email      Xác thực email (?token=xxx)
+POST   /auth/login             Đăng nhập → trả JWT token
+POST   /auth/seed-admin        Tạo tài khoản admin (dev only, cần secret)
+
+Production:
+POST   https://be-fashion-shop-uvp9.onrender.com/auth/register
+GET    https://be-fashion-shop-uvp9.onrender.com/auth/verify-email?token=xxx
+POST   https://be-fashion-shop-uvp9.onrender.com/auth/login
+POST   https://be-fashion-shop-uvp9.onrender.com/auth/seed-admin
+
+--- PRODUCTS ---
+GET    /products               Danh sách sản phẩm (public, có ?search=&category=&page=&limit=)
+GET    /products/:id           Chi tiết sản phẩm (public)
+POST   /products               Tạo sản phẩm (admin)
+PUT    /products/:id           Cập nhật sản phẩm (admin)
+DELETE /products/:id           Xóa sản phẩm (admin)
+POST   /products/upload        Upload ảnh lên Cloudinary (admin)
+
+Production:
+GET    https://be-fashion-shop-uvp9.onrender.com/products
+GET    https://be-fashion-shop-uvp9.onrender.com/products/:id
+POST   https://be-fashion-shop-uvp9.onrender.com/products
+PUT    https://be-fashion-shop-uvp9.onrender.com/products/:id
+DELETE https://be-fashion-shop-uvp9.onrender.com/products/:id
+POST   https://be-fashion-shop-uvp9.onrender.com/products/upload
+
+--- USERS (admin only) ---
+GET    /users                  Danh sách tất cả users
+GET    /users/:id              Chi tiết user
+PUT    /users/:id              Cập nhật user
+DELETE /users/:id              Xóa user
+
+Production:
+GET    https://be-fashion-shop-uvp9.onrender.com/users
+GET    https://be-fashion-shop-uvp9.onrender.com/users/:id
+PUT    https://be-fashion-shop-uvp9.onrender.com/users/:id
+DELETE https://be-fashion-shop-uvp9.onrender.com/users/:id
+
+--- CART (cần JWT token) ---
+GET    /cart                   Lấy giỏ hàng của user hiện tại
+POST   /cart                   Thêm sản phẩm vào giỏ
+PUT    /cart/:itemId           Cập nhật số lượng
+DELETE /cart/:itemId           Xóa sản phẩm khỏi giỏ
+
+Production:
+GET    https://be-fashion-shop-uvp9.onrender.com/cart
+POST   https://be-fashion-shop-uvp9.onrender.com/cart
+PUT    https://be-fashion-shop-uvp9.onrender.com/cart/:itemId
+DELETE https://be-fashion-shop-uvp9.onrender.com/cart/:itemId
+
+--- ORDERS (cần JWT token) ---
+POST   /orders                 Tạo đơn hàng (user)
+GET    /orders/my              Lịch sử đơn hàng của user hiện tại
+GET    /orders                 Tất cả đơn hàng (admin)
+GET    /orders/:id             Chi tiết đơn hàng
+PATCH  /orders/:id/status      Cập nhật trạng thái đơn (admin)
+DELETE /orders/:id             Hủy đơn hàng (admin)
+
+Production:
+POST   https://be-fashion-shop-uvp9.onrender.com/orders
+GET    https://be-fashion-shop-uvp9.onrender.com/orders/my
+GET    https://be-fashion-shop-uvp9.onrender.com/orders
+GET    https://be-fashion-shop-uvp9.onrender.com/orders/:id
+PATCH  https://be-fashion-shop-uvp9.onrender.com/orders/:id/status
+DELETE https://be-fashion-shop-uvp9.onrender.com/orders/:id
+
+
+❌ CHƯA LÀM
+================================================================
+
+--- AUTH ---
+POST   /auth/logout            Đăng xuất (blacklist token)
+POST   /auth/forgot-password   Quên mật khẩu (gửi email reset)
+POST   /auth/reset-password    Đặt lại mật khẩu mới
+
+--- CATEGORIES ---
+GET    /categories             Danh sách danh mục
+POST   /categories             Thêm danh mục (admin)
+PUT    /categories/:id         Sửa danh mục (admin)
+DELETE /categories/:id         Xóa danh mục (admin)
+PATCH  /categories/:id/toggle  Ẩn/hiện danh mục (admin)
+
+--- DASHBOARD (admin) ---
+GET    /dashboard/stats        Tổng đơn, tổng SP, doanh thu, đơn mới
+
+--- REVIEWS ---
+GET    /products/:id/reviews   Lấy đánh giá sản phẩm
+POST   /products/:id/reviews   Gửi đánh giá (user đã mua)
+
+--- USERS ---
+GET    /users/me               Thông tin user đang đăng nhập
+PUT    /users/me               Cập nhật thông tin cá nhân
+
+
+================================================================
+GHI CHÚ
+================================================================
+- Tất cả route có 🔒 yêu cầu header: Authorization: Bearer <token>
+- Admin account: admin@fashionshop.com / Admin@123
+- Token hết hạn sau 7 ngày
+- Order status: pending | confirmed | shipping | delivered | cancelled
+================================================================
