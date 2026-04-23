@@ -1,40 +1,56 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
+import { CartItem } from './cart.entity';
 import { AddToCartDto } from './dto/add-to-cart.dto';
 import { UpdateCartDto } from './dto/update-cart.dto';
 
-// Phải có export để Controller không bị lỗi TS4053
-export interface CartItem extends AddToCartDto {
-  id: number;
-}
-
 @Injectable()
 export class CartService {
-  private cart: CartItem[] = []; 
+  constructor(
+    @InjectRepository(CartItem)
+    private readonly cartRepo: Repository<CartItem>,
+  ) {}
 
-  addToCart(addToCartDto: AddToCartDto) {
-    const newItem: CartItem = {
-      ...addToCartDto,    // Spread DTO trước
-      id: Date.now(),     // Gán ID sau để đảm bảo không bị ghi đè
-    };
-    this.cart.push(newItem);
-    return { message: 'Product added to cart', cart: this.cart };
+  async getCart(userId: number): Promise<CartItem[]> {
+    return this.cartRepo.findBy({ userId });
   }
 
-  updateCart(id: number, updateCartDto: UpdateCartDto) {
-    const cartItem = this.cart.find((item) => item.id === id);
-    if (cartItem) {
-      Object.assign(cartItem, updateCartDto);
-      return { message: 'Cart updated', cart: this.cart };
+  async addToCart(userId: number, dto: AddToCartDto): Promise<CartItem> {
+    const existing = await this.cartRepo.findOneBy({
+      userId,
+      productId: dto.productId,
+    });
+
+    if (existing) {
+      existing.quantity += dto.quantity;
+      return this.cartRepo.save(existing);
     }
-    return { message: 'Item not found in cart' };
+
+    const item = this.cartRepo.create({ ...dto, userId });
+    return this.cartRepo.save(item);
   }
 
-  removeFromCart(id: number) {
-    this.cart = this.cart.filter((item) => item.id !== id);
-    return { message: 'Product removed from cart', cart: this.cart };
+  async updateCart(
+    userId: number,
+    itemId: number,
+    dto: UpdateCartDto,
+  ): Promise<CartItem> {
+    const item = await this.cartRepo.findOneBy({ id: itemId, userId });
+    if (!item)
+      throw new NotFoundException('Không tìm thấy sản phẩm trong giỏ hàng');
+    item.quantity = dto.quantity;
+    return this.cartRepo.save(item);
   }
 
-  getCart() {
-    return this.cart;
+  async removeFromCart(
+    userId: number,
+    itemId: number,
+  ): Promise<{ message: string }> {
+    const item = await this.cartRepo.findOneBy({ id: itemId, userId });
+    if (!item)
+      throw new NotFoundException('Không tìm thấy sản phẩm trong giỏ hàng');
+    await this.cartRepo.remove(item);
+    return { message: 'Đã xóa sản phẩm khỏi giỏ hàng' };
   }
 }

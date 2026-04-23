@@ -1,2 +1,2 @@
 "email": "admin@fashionshop.com",
-    "password": ""
+    "password": "Admin@123"

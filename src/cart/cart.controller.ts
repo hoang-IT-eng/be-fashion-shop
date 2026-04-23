@@ -1,29 +1,59 @@
-import { Controller, Get, Post, Delete, Put, Body, Param, ParseIntPipe } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Put,
+  Delete,
+  Body,
+  Param,
+  ParseIntPipe,
+  UseGuards,
+  Req,
+} from '@nestjs/common';
+import type { Request } from 'express';
 import { CartService } from './cart.service';
 import { AddToCartDto } from './dto/add-to-cart.dto';
 import { UpdateCartDto } from './dto/update-cart.dto';
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { User } from '../users/user.entity';
 
-@Controller('api/cart') // Khớp endpoint /api/cart
+import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
+
+@ApiTags('Cart')
+@ApiBearerAuth('access-token')
+@Controller('cart')
+@UseGuards(JwtAuthGuard)
 export class CartController {
   constructor(private readonly cartService: CartService) {}
 
-  @Get() // GET /api/cart
-  getCart() {
-    return this.cartService.getCart();
+  @Get()
+  getCart(@Req() req: Request) {
+    const user = req.user as User;
+    return this.cartService.getCart(user.id);
   }
 
-  @Post() // POST /api/cart
-  addToCart(@Body() addToCartDto: AddToCartDto) {
-    return this.cartService.addToCart(addToCartDto);
+  @Post()
+  addToCart(@Req() req: Request, @Body() dto: AddToCartDto) {
+    const user = req.user as User;
+    return this.cartService.addToCart(user.id, dto);
   }
 
-  @Put(':itemId') // PUT /api/cart/:itemId
-  updateCart(@Param('itemId', ParseIntPipe) itemId: number, @Body() updateCartDto: UpdateCartDto) {
-    return this.cartService.updateCart(itemId, updateCartDto);
+  @Put(':itemId')
+  updateCart(
+    @Req() req: Request,
+    @Param('itemId', ParseIntPipe) itemId: number,
+    @Body() dto: UpdateCartDto,
+  ) {
+    const user = req.user as User;
+    return this.cartService.updateCart(user.id, itemId, dto);
   }
 
-  @Delete(':itemId') // DELETE /api/cart/:itemId
-  removeFromCart(@Param('itemId', ParseIntPipe) itemId: number) {
-    return this.cartService.removeFromCart(itemId);
+  @Delete(':itemId')
+  removeFromCart(
+    @Req() req: Request,
+    @Param('itemId', ParseIntPipe) itemId: number,
+  ) {
+    const user = req.user as User;
+    return this.cartService.removeFromCart(user.id, itemId);
   }
 }

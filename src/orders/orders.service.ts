@@ -1,50 +1,44 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
+import { Order, OrderStatus } from './order.entity';
 import { CreateOrderDto } from './dto/create-order.dto';
-
-export interface Order extends CreateOrderDto {
-  id: number;
-}
 
 @Injectable()
 export class OrdersService {
-  private orders: Order[] = [];
+  constructor(
+    @InjectRepository(Order)
+    private readonly orderRepo: Repository<Order>,
+  ) {}
 
-  createOrder(createOrderDto: CreateOrderDto) {
-    const newOrder: Order = { 
-      ...createOrderDto, 
-      id: Date.now() 
-    };
-    this.orders.push(newOrder);
-    return { message: 'Order created', order: newOrder };
+  async createOrder(userId: number, dto: CreateOrderDto): Promise<Order> {
+    const order = this.orderRepo.create({ ...dto, userId });
+    return this.orderRepo.save(order);
   }
 
-  getOrders() {
-    return this.orders;
+  async getMyOrders(userId: number): Promise<Order[]> {
+    return this.orderRepo.findBy({ userId });
   }
 
-  getOrderById(id: number) {
-    return this.orders.find((order) => order.id === id);
+  async getAllOrders(): Promise<Order[]> {
+    return this.orderRepo.find({ order: { createdAt: 'DESC' } });
   }
 
-  deleteOrder(id: number) {
-    const index = this.orders.findIndex(order => order.id === id);
-    if (index !== -1) {
-      const deletedOrder = this.orders.splice(index, 1);
-      return { message: 'Order deleted', order: deletedOrder[0] };
-    }
-    return { message: 'Order not found' };
+  async getOrderById(id: number): Promise<Order> {
+    const order = await this.orderRepo.findOneBy({ id });
+    if (!order) throw new NotFoundException(`Không tìm thấy đơn hàng id=${id}`);
+    return order;
   }
 
-  updateStatus(id: number, status: string) {
-  const order = this.orders.find((o) => o.id === id);
-  
-  if (!order) {
-    return { message: 'Không tìm thấy đơn hàng để cập nhật' };
+  async updateStatus(id: number, status: OrderStatus): Promise<Order> {
+    const order = await this.getOrderById(id);
+    order.status = status;
+    return this.orderRepo.save(order);
   }
-  order['status'] = status; 
-  return { 
-    message: 'Cập nhật trạng thái thành công', 
-    order 
-  };
-}
+
+  async deleteOrder(id: number): Promise<{ message: string }> {
+    const order = await this.getOrderById(id);
+    await this.orderRepo.remove(order);
+    return { message: `Đã hủy đơn hàng id=${id}` };
+  }
 }

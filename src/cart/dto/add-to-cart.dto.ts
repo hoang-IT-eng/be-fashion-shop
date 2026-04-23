@@ -1,13 +1,30 @@
-export class AddToCartDto {
-  id: number;
-  name: string;
-  price: number;
-  quantity: number;
+import {
+  IsInt,
+  IsNotEmpty,
+  IsNumber,
+  IsPositive,
+  IsString,
+  Min,
+} from 'class-validator';
+import { Type } from 'class-transformer';
 
-  constructor(id: number, name: string, price: number, quantity: number) {
-    this.id = id;
-    this.name = name;
-    this.price = price;
-    this.quantity = quantity;
-  }
+export class AddToCartDto {
+  @IsInt()
+  @IsPositive()
+  @Type(() => Number)
+  productId: number;
+
+  @IsString()
+  @IsNotEmpty()
+  name: string;
+
+  @IsNumber()
+  @IsPositive()
+  @Type(() => Number)
+  price: number;
+
+  @IsInt()
+  @Min(1)
+  @Type(() => Number)
+  quantity: number;
 }

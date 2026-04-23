@@ -1,19 +1,41 @@
-export class CartItemDto {
-  id: number;
-  name: string;
-  price: number;
-  quantity: number;
+import {
+  IsArray,
+  IsNotEmpty,
+  IsNumber,
+  IsPositive,
+  IsString,
+  ValidateNested,
+} from 'class-validator';
+import { Type } from 'class-transformer';
 
-  constructor(id: number, name: string, price: number, quantity: number) {
-    this.id = id;
-    this.name = name;
-    this.price = price;
-    this.quantity = quantity;
-  }
+export class OrderItemDto {
+  @IsNumber()
+  productId: number;
+
+  @IsString()
+  @IsNotEmpty()
+  name: string;
+
+  @IsNumber()
+  @IsPositive()
+  price: number;
+
+  @IsNumber()
+  @IsPositive()
+  quantity: number;
 }
 
 export class CreateOrderDto {
-  cart: CartItemDto[] = []; // Khởi tạo giá trị mặc định
-  total: number = 0; // Khởi tạo giá trị mặc định
-  paymentMethod: string = ''; // Khởi tạo giá trị mặc định
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => OrderItemDto)
+  items: OrderItemDto[];
+
+  @IsNumber()
+  @IsPositive()
+  total: number;
+
+  @IsString()
+  @IsNotEmpty()
+  paymentMethod: string;
 }
