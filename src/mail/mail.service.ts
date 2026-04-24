@@ -36,4 +36,25 @@ export class MailService {
       `,
     });
   }
+
+  async sendResetPasswordEmail(to: string, token: string) {
+    const feUrl = this.cfg.get<string>('FE_URL', 'http://localhost:5173');
+    const resetUrl = `${feUrl}/reset-password?token=${token}`;
+
+    await this.transporter.sendMail({
+      from: `"Fashion Shop" <${this.cfg.get('MAIL_USER')}>`,
+      to,
+      subject: 'Đặt lại mật khẩu Fashion Shop',
+      html: `
+        <div style="font-family:Arial,sans-serif;max-width:480px;margin:auto;padding:32px;border:1px solid #eee;border-radius:12px">
+          <h2 style="color:#7a5aff">Fashion Shop</h2>
+          <p>Bạn vừa yêu cầu đặt lại mật khẩu. Nhấn nút bên dưới để tiếp tục:</p>
+          <a href="${resetUrl}" style="display:inline-block;margin:20px 0;padding:12px 28px;background:#7a5aff;color:#fff;border-radius:8px;text-decoration:none;font-weight:bold">
+            Đặt lại mật khẩu
+          </a>
+          <p style="color:#888;font-size:13px">Link có hiệu lực trong 15 phút. Nếu bạn không yêu cầu, hãy bỏ qua email này.</p>
+        </div>
+      `,
+    });
+  }
 }

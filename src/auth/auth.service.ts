@@ -14,6 +14,8 @@ import { randomUUID } from 'crypto';
 import { User, UserRole } from '../users/user.entity';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
+import { ForgotPasswordDto } from './dto/forgot-password.dto';
+import { ResetPasswordDto } from './dto/reset-password.dto';
 import { MailService } from '../mail/mail.service';
 
 @Injectable()
@@ -117,5 +119,53 @@ export class AuthService {
     await this.userRepo.save(admin);
 
     return { message: 'Tạo admin thành công', email, password: 'Admin@123' };
+  }
+
+  async forgotPassword(dto: ForgotPasswordDto) {
+    const user = await this.userRepo.findOneBy({ email: dto.email });
+    // Không tiết lộ email có tồn tại hay không
+    if (!user)
+      return {
+        message:
+          'Nếu email tồn tại, bạn sẽ nhận được hướng dẫn đặt lại mật khẩu.',
+      };
+
+    const resetToken = randomUUID();
+    const resetTokenExpiry = new Date(Date.now() + 15 * 60 * 1000); // 15 phút
+
+    user.resetToken = resetToken;
+    user.resetTokenExpiry = resetTokenExpiry;
+    await this.userRepo.save(user);
+
+    await this.mailService.sendResetPasswordEmail(dto.email, resetToken);
+    return {
+      message:
+        'Nếu email tồn tại, bạn sẽ nhận được hướng dẫn đặt lại mật khẩu.',
+    };
+  }
+
+  async resetPassword(dto: ResetPasswordDto) {
+    const user = await this.userRepo.findOneBy({ resetToken: dto.token });
+    if (!user || !user.resetTokenExpiry) {
+      throw new BadRequestException('Token không hợp lệ hoặc đã hết hạn');
+    }
+
+    if (user.resetTokenExpiry < new Date()) {
+      throw new BadRequestException('Token đã hết hạn. Vui lòng yêu cầu lại.');
+    }
+
+    user.password = await bcrypt.hash(dto.newPassword, 10);
+    user.resetToken = null;
+    user.resetTokenExpiry = null;
+    await this.userRepo.save(user);
+
+    return {
+      message:
+        'Đặt lại mật khẩu thành công. Bạn có thể đăng nhập ngay bây giờ.',
+    };
+  }
+
+  logout() {
+    return { message: 'Đăng xuất thành công' };
   }
 }
