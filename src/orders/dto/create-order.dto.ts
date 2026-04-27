@@ -1,28 +1,21 @@
 import {
   IsArray,
+  IsEnum,
   IsNotEmpty,
   IsNumber,
   IsPositive,
   IsString,
   ValidateNested,
+  IsPhoneNumber,
 } from 'class-validator';
 import { Type } from 'class-transformer';
+import { PaymentMethod } from '../order.entity';
 
 export class OrderItemDto {
-  @IsNumber()
-  productId: number;
-
-  @IsString()
-  @IsNotEmpty()
-  name: string;
-
-  @IsNumber()
-  @IsPositive()
-  price: number;
-
-  @IsNumber()
-  @IsPositive()
-  quantity: number;
+  @IsNumber() productId: number;
+  @IsString() @IsNotEmpty() name: string;
+  @IsNumber() @IsPositive() price: number;
+  @IsNumber() @IsPositive() quantity: number;
 }
 
 export class CreateOrderDto {
@@ -36,6 +29,17 @@ export class CreateOrderDto {
   total: number;
 
   @IsString()
-  @IsNotEmpty()
-  paymentMethod: string;
+  @IsNotEmpty({ message: 'Tên người nhận không được để trống' })
+  shippingName: string;
+
+  @IsString()
+  @IsNotEmpty({ message: 'Số điện thoại không được để trống' })
+  shippingPhone: string;
+
+  @IsString()
+  @IsNotEmpty({ message: 'Địa chỉ giao hàng không được để trống' })
+  shippingAddress: string;
+
+  @IsEnum(PaymentMethod)
+  paymentMethod: PaymentMethod;
 }
