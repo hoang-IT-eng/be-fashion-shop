@@ -9,7 +9,6 @@ describe('Orders (e2e)', () => {
   let app: INestApplication<App>;
   let dataSource: DataSource;
   let adminToken: string;
-  let userToken: string;
   let orderId: number;
 
   beforeAll(async () => {
@@ -22,6 +21,7 @@ describe('Orders (e2e)', () => {
     await app.init();
 
     dataSource = moduleFixture.get(DataSource);
+    // Xóa orders trước, sau đó users (do FK constraint)
     await dataSource.query('DELETE FROM orders');
     await dataSource.query('DELETE FROM users');
 
@@ -34,18 +34,6 @@ describe('Orders (e2e)', () => {
       .post('/auth/login')
       .send({ email: 'admin@fashionshop.com', password: 'Admin@123' });
     adminToken = (adminLogin.body as { accessToken: string }).accessToken;
-
-    // Tạo user thường (bypass email verify bằng cách dùng admin tạo trực tiếp)
-    await dataSource.query(`
-      INSERT INTO users (name, email, password, role, "isVerified", "verifyToken")
-      VALUES ('Test User', 'user@test.com', '$2b$10$test', 'user', true, null)
-    `);
-    const userLogin = await request(app.getHttpServer())
-      .post('/auth/login')
-      .send({ email: 'user@test.com', password: 'test' });
-
-    // Nếu login thất bại (password hash không đúng), dùng admin token để test
-    userToken = (userLogin.body as { accessToken?: string }).accessToken ?? adminToken;
   });
 
   afterAll(async () => {

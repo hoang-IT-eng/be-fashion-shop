@@ -1,0 +1,325 @@
+Run npm run test:e2e -- --forceExit
+
+> be-fashion-shop@0.0.1 test:e2e
+> jest --config ./test/jest-e2e.json --forceExit
+
+[Nest] 2997  - 05/01/2026, 7:54:06 AM   ERROR [TypeOrmModule] Unable to connect to the database. Retrying (1)...
+QueryFailedError: duplicate key value violates unique constraint "pg_type_typname_nsp_index"
+    at PostgresQueryRunner.query (/home/runner/work/be-fashion-shop/be-fashion-shop/src/driver/postgres/PostgresQueryRunner.ts:325:19)
+    at processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at PostgresQueryRunner.executeQueries (/home/runner/work/be-fashion-shop/be-fashion-shop/src/query-runner/BaseQueryRunner.ts:681:13)
+    at PostgresQueryRunner.createTable (/home/runner/work/be-fashion-shop/be-fashion-shop/src/driver/postgres/PostgresQueryRunner.ts:616:9)
+    at RdbmsSchemaBuilder.createNewTables (/home/runner/work/be-fashion-shop/be-fashion-shop/src/schema-builder/RdbmsSchemaBuilder.ts:635:13)
+    at RdbmsSchemaBuilder.executeSchemaSyncOperationsInProperOrder (/home/runner/work/be-fashion-shop/be-fashion-shop/src/schema-builder/RdbmsSchemaBuilder.ts:225:9)
+    at RdbmsSchemaBuilder.build (/home/runner/work/be-fashion-shop/be-fashion-shop/src/schema-builder/RdbmsSchemaBuilder.ts:95:13)
+    at DataSource.synchronize (/home/runner/work/be-fashion-shop/be-fashion-shop/src/data-source/DataSource.ts:340:9)
+    at DataSource.initialize (/home/runner/work/be-fashion-shop/be-fashion-shop/src/data-source/DataSource.ts:278:43)
+[Nest] 2990  - 05/01/2026, 7:54:06 AM   ERROR [TypeOrmModule] Unable to connect to the database. Retrying (1)...
+QueryFailedError: duplicate key value violates unique constraint "pg_type_typname_nsp_index"
+    at PostgresQueryRunner.query (/home/runner/work/be-fashion-shop/be-fashion-shop/src/driver/postgres/PostgresQueryRunner.ts:325:19)
+    at processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at PostgresQueryRunner.executeQueries (/home/runner/work/be-fashion-shop/be-fashion-shop/src/query-runner/BaseQueryRunner.ts:681:13)
+    at PostgresQueryRunner.createTable (/home/runner/work/be-fashion-shop/be-fashion-shop/src/driver/postgres/PostgresQueryRunner.ts:616:9)
+    at RdbmsSchemaBuilder.createNewTables (/home/runner/work/be-fashion-shop/be-fashion-shop/src/schema-builder/RdbmsSchemaBuilder.ts:635:13)
+    at RdbmsSchemaBuilder.executeSchemaSyncOperationsInProperOrder (/home/runner/work/be-fashion-shop/be-fashion-shop/src/schema-builder/RdbmsSchemaBuilder.ts:225:9)
+    at RdbmsSchemaBuilder.build (/home/runner/work/be-fashion-shop/be-fashion-shop/src/schema-builder/RdbmsSchemaBuilder.ts:95:13)
+    at DataSource.synchronize (/home/runner/work/be-fashion-shop/be-fashion-shop/src/data-source/DataSource.ts:340:9)
+    at DataSource.initialize (/home/runner/work/be-fashion-shop/be-fashion-shop/src/data-source/DataSource.ts:278:43)
+PASS test/auth.e2e-spec.ts
+(node:2991) DeprecationWarning: Calling client.query() when the client is already executing a query is deprecated and will be removed in pg@9.0. Use async/await or an external async flow control mechanism instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+PASS test/app.e2e-spec.ts
+(node:2997) DeprecationWarning: Calling client.query() when the client is already executing a query is deprecated and will be removed in pg@9.0. Use async/await or an external async flow control mechanism instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+(node:2990) DeprecationWarning: Calling client.query() when the client is already executing a query is deprecated and will be removed in pg@9.0. Use async/await or an external async flow control mechanism instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+[Nest] 2990  - 05/01/2026, 7:54:09 AM   ERROR [ExceptionsHandler] QueryFailedError: duplicate key value violates unique constraint "UQ_97672ac88f789774dd47f7c8be3"
+    at PostgresQueryRunner.query (/home/runner/work/be-fashion-shop/be-fashion-shop/src/driver/postgres/PostgresQueryRunner.ts:325:19)
+    at processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at InsertQueryBuilder.execute (/home/runner/work/be-fashion-shop/be-fashion-shop/src/query-builder/InsertQueryBuilder.ts:164:33)
+    at SubjectExecutor.executeInsertOperations (/home/runner/work/be-fashion-shop/be-fashion-shop/src/persistence/SubjectExecutor.ts:435:42)
+    at SubjectExecutor.execute (/home/runner/work/be-fashion-shop/be-fashion-shop/src/persistence/SubjectExecutor.ts:137:9)
+    at EntityPersistExecutor.execute (/home/runner/work/be-fashion-shop/be-fashion-shop/src/persistence/EntityPersistExecutor.ts:182:21)
+    at AuthService.seedAdmin (/home/runner/work/be-fashion-shop/be-fashion-shop/src/auth/auth.service.ts:117:5)
+    at /home/runner/work/be-fashion-shop/be-fashion-shop/node_modules/@nestjs/core/router/router-execution-context.js:46:28
+    at /home/runner/work/be-fashion-shop/be-fashion-shop/node_modules/@nestjs/core/router/router-proxy.js:9:17 {
+  query: 'INSERT INTO "users"("name", "email", "password", "role", "isVerified", "verifyToken") VALUES ($1, $2, $3, $4, $5, $6) RETURNING "id", "role", "isVerified"',
+  parameters: [
+    'Admin',
+    'admin@fashionshop.com',
+    '$2b$10$CaBs6mxnuSb1V3ns8q5w5OyE5bTnDRTrRhQ.IRnHsGt85myWmS8US',
+    'admin',
+    1,
+    null
+  ],
+  driverError: error: duplicate key value violates unique constraint "UQ_97672ac88f789774dd47f7c8be3"
+      at /home/runner/work/be-fashion-shop/be-fashion-shop/node_modules/pg/lib/client.js:631:17
+      at processTicksAndRejections (node:internal/process/task_queues:95:5)
+      at PostgresQueryRunner.query (/home/runner/work/be-fashion-shop/be-fashion-shop/src/driver/postgres/PostgresQueryRunner.ts:254:25)
+      at InsertQueryBuilder.execute (/home/runner/work/be-fashion-shop/be-fashion-shop/src/query-builder/InsertQueryBuilder.ts:164:33)
+      at SubjectExecutor.executeInsertOperations (/home/runner/work/be-fashion-shop/be-fashion-shop/src/persistence/SubjectExecutor.ts:435:42)
+      at SubjectExecutor.execute (/home/runner/work/be-fashion-shop/be-fashion-shop/src/persistence/SubjectExecutor.ts:137:9)
+      at EntityPersistExecutor.execute (/home/runner/work/be-fashion-shop/be-fashion-shop/src/persistence/EntityPersistExecutor.ts:182:21)
+      at AuthService.seedAdmin (/home/runner/work/be-fashion-shop/be-fashion-shop/src/auth/auth.service.ts:117:5)
+      at /home/runner/work/be-fashion-shop/be-fashion-shop/node_modules/@nestjs/core/router/router-execution-context.js:46:28
+      at /home/runner/work/be-fashion-shop/be-fashion-shop/node_modules/@nestjs/core/router/router-proxy.js:9:17 {
+    length: 243,
+    severity: 'ERROR',
+    code: '23505',
+    detail: 'Key (email)=(admin@fashionshop.com) already exists.',
+    hint: undefined,
+    position: undefined,
+    internalPosition: undefined,
+    internalQuery: undefined,
+    where: undefined,
+    schema: 'public',
+    table: 'users',
+    column: undefined,
+    dataType: undefined,
+    constraint: 'UQ_97672ac88f789774dd47f7c8be3',
+    file: 'nbtinsert.c',
+    line: '666',
+    routine: '_bt_check_unique'
+  },
+  length: 243,
+  severity: 'ERROR',
+  code: '23505',
+  detail: 'Key (email)=(admin@fashionshop.com) already exists.',
+  hint: undefined,
+  position: undefined,
+  internalPosition: undefined,
+  internalQuery: undefined,
+  where: undefined,
+  schema: 'public',
+  table: 'users',
+  column: undefined,
+  dataType: undefined,
+  constraint: 'UQ_97672ac88f789774dd47f7c8be3',
+  file: 'nbtinsert.c',
+  line: '666',
+  routine: '_bt_check_unique'
+}
+[Nest] 2990  - 05/01/2026, 7:54:10 AM   ERROR [ExceptionsHandler] QueryFailedError: insert or update on table "orders" violates foreign key constraint "FK_151b79a83ba240b0cb31b2302d1"
+    at PostgresQueryRunner.query (/home/runner/work/be-fashion-shop/be-fashion-shop/src/driver/postgres/PostgresQueryRunner.ts:325:19)
+    at processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at InsertQueryBuilder.execute (/home/runner/work/be-fashion-shop/be-fashion-shop/src/query-builder/InsertQueryBuilder.ts:164:33)
+    at SubjectExecutor.executeInsertOperations (/home/runner/work/be-fashion-shop/be-fashion-shop/src/persistence/SubjectExecutor.ts:435:42)
+    at SubjectExecutor.execute (/home/runner/work/be-fashion-shop/be-fashion-shop/src/persistence/SubjectExecutor.ts:137:9)
+    at EntityPersistExecutor.execute (/home/runner/work/be-fashion-shop/be-fashion-shop/src/persistence/EntityPersistExecutor.ts:182:21)
+    at OrdersService.createOrder (/home/runner/work/be-fashion-shop/be-fashion-shop/src/orders/orders.service.ts:27:19)
+    at /home/runner/work/be-fashion-shop/be-fashion-shop/node_modules/@nestjs/core/router/router-execution-context.js:46:28
+    at /home/runner/work/be-fashion-shop/be-fashion-shop/node_modules/@nestjs/core/router/router-proxy.js:9:17 {
+  query: 'INSERT INTO "orders"("userId", "items", "total", "shippingName", "shippingPhone", "shippingAddress", "paymentMethod", "paymentStatus", "vnpayTransactionId", "status", "createdAt") VALUES ($1, $2, $3, $4, $5, $6, $7, DEFAULT, DEFAULT, DEFAULT, DEFAULT) RETURNING "id", "paymentMethod", "paymentStatus", "status", "createdAt"',
+  parameters: [
+    2,
+    '[{"productId":1,"name":"Áo thun","price":199000,"quantity":2}]',
+    398000,
+    'Nguyễn Văn A',
+    '0901234567',
+    '123 Đường ABC, TP.HCM',
+    'cod'
+  ],
+  driverError: error: insert or update on table "orders" violates foreign key constraint "FK_151b79a83ba240b0cb31b2302d1"
+      at /home/runner/work/be-fashion-shop/be-fashion-shop/node_modules/pg/lib/client.js:631:17
+      at processTicksAndRejections (node:internal/process/task_queues:95:5)
+      at PostgresQueryRunner.query (/home/runner/work/be-fashion-shop/be-fashion-shop/src/driver/postgres/PostgresQueryRunner.ts:254:25)
+      at InsertQueryBuilder.execute (/home/runner/work/be-fashion-shop/be-fashion-shop/src/query-builder/InsertQueryBuilder.ts:164:33)
+      at SubjectExecutor.executeInsertOperations (/home/runner/work/be-fashion-shop/be-fashion-shop/src/persistence/SubjectExecutor.ts:435:42)
+      at SubjectExecutor.execute (/home/runner/work/be-fashion-shop/be-fashion-shop/src/persistence/SubjectExecutor.ts:137:9)
+      at EntityPersistExecutor.execute (/home/runner/work/be-fashion-shop/be-fashion-shop/src/persistence/EntityPersistExecutor.ts:182:21)
+      at OrdersService.createOrder (/home/runner/work/be-fashion-shop/be-fashion-shop/src/orders/orders.service.ts:27:19)
+      at /home/runner/work/be-fashion-shop/be-fashion-shop/node_modules/@nestjs/core/router/router-execution-context.js:46:28
+      at /home/runner/work/be-fashion-shop/be-fashion-shop/node_modules/@nestjs/core/router/router-proxy.js:9:17 {
+    length: 267,
+    severity: 'ERROR',
+    code: '23503',
+    detail: 'Key (userId)=(2) is not present in table "users".',
+    hint: undefined,
+    position: undefined,
+    internalPosition: undefined,
+    internalQuery: undefined,
+    where: undefined,
+    schema: 'public',
+    table: 'orders',
+    column: undefined,
+    dataType: undefined,
+    constraint: 'FK_151b79a83ba240b0cb31b2302d1',
+    file: 'ri_triggers.c',
+    line: '2608',
+    routine: 'ri_ReportViolation'
+  },
+  length: 267,
+  severity: 'ERROR',
+  code: '23503',
+  detail: 'Key (userId)=(2) is not present in table "users".',
+  hint: undefined,
+  position: undefined,
+  internalPosition: undefined,
+  internalQuery: undefined,
+  where: undefined,
+  schema: 'public',
+  table: 'orders',
+  column: undefined,
+  dataType: undefined,
+  constraint: 'FK_151b79a83ba240b0cb31b2302d1',
+  file: 'ri_triggers.c',
+  line: '2608',
+  routine: 'ri_ReportViolation'
+}
+PASS test/categories.e2e-spec.ts (6.486 s)
+FAIL test/orders.e2e-spec.ts (6.603 s)
+  ● Orders (e2e) › POST /orders › should create COD order
+
+    expected 201 "Created", got 500 "Internal Server Error"
+
+      68 |           paymentMethod: 'cod',
+      69 |         })
+    > 70 |         .expect(201);
+         |          ^
+      71 |
+      72 |       const body = res.body as { order: { id: number; paymentMethod: string; paymentStatus: string } };
+      73 |       expect(body.order.paymentMethod).toBe('cod');
+
+      at Object.<anonymous> (orders.e2e-spec.ts:70:10)
+      ----
+      at Test._assertStatus (../node_modules/supertest/lib/test.js:309:14)
+      at ../node_modules/supertest/lib/test.js:365:13
+      at Test._assertFunction (../node_modules/supertest/lib/test.js:342:13)
+      at Test.assert (../node_modules/supertest/lib/test.js:195:23)
+      at localAssert (../node_modules/supertest/lib/test.js:138:14)
+      at Server.<anonymous> (../node_modules/supertest/lib/test.js:152:11)
+
+  ● Orders (e2e) › POST /orders › should create VNPAY order and return paymentUrl
+
+    expected 201 "Created", got 401 "Unauthorized"
+
+      88 |           paymentMethod: 'vnpay',
+      89 |         })
+    > 90 |         .expect(201);
+         |          ^
+      91 |
+      92 |       const body = res.body as { order: { id: number }; paymentUrl?: string };
+      93 |       expect(body.paymentUrl).toBeDefined();
+
+      at Object.<anonymous> (orders.e2e-spec.ts:90:10)
+      ----
+      at Test._assertStatus (../node_modules/supertest/lib/test.js:309:14)
+      at ../node_modules/supertest/lib/test.js:365:13
+      at Test._assertFunction (../node_modules/supertest/lib/test.js:342:13)
+      at Test.assert (../node_modules/supertest/lib/test.js:195:23)
+      at localAssert (../node_modules/supertest/lib/test.js:138:14)
+      at Server.<anonymous> (../node_modules/supertest/lib/test.js:152:11)
+
+  ● Orders (e2e) › POST /orders › should return 400 without shipping info
+
+    expected 400 "Bad Request", got 401 "Unauthorized"
+
+      105 |           // thiếu shippingName, shippingPhone, shippingAddress
+      106 |         })
+    > 107 |         .expect(400);
+          |          ^
+      108 |     });
+      109 |
+      110 |     it('should return 401 without token', () => {
+
+      at Object.<anonymous> (orders.e2e-spec.ts:107:10)
+      ----
+      at Test._assertStatus (../node_modules/supertest/lib/test.js:309:14)
+      at ../node_modules/supertest/lib/test.js:365:13
+      at Test._assertFunction (../node_modules/supertest/lib/test.js:342:13)
+      at Test.assert (../node_modules/supertest/lib/test.js:195:23)
+      at localAssert (../node_modules/supertest/lib/test.js:138:14)
+      at Server.<anonymous> (../node_modules/supertest/lib/test.js:152:11)
+
+  ● Orders (e2e) › GET /orders/my › should return user orders
+
+    expected 200 "OK", got 401 "Unauthorized"
+
+      118 |         .get('/orders/my')
+      119 |         .set('Authorization', `***
+    > 120 |         .expect(200);
+          |          ^
+      121 |
+      122 |       expect(Array.isArray(res.body)).toBe(true);
+      123 |     });
+
+      at Object.<anonymous> (orders.e2e-spec.ts:120:10)
+      ----
+      at Test._assertStatus (../node_modules/supertest/lib/test.js:309:14)
+      at ../node_modules/supertest/lib/test.js:365:13
+      at Test._assertFunction (../node_modules/supertest/lib/test.js:342:13)
+      at Test.assert (../node_modules/supertest/lib/test.js:195:23)
+      at localAssert (../node_modules/supertest/lib/test.js:138:14)
+      at Server.<anonymous> (../node_modules/supertest/lib/test.js:152:11)
+
+  ● Orders (e2e) › GET /orders (admin) › should return all orders for admin
+
+    expected 200 "OK", got 401 "Unauthorized"
+
+      129 |         .get('/orders')
+      130 |         .set('Authorization', `***
+    > 131 |         .expect(200);
+          |          ^
+      132 |
+      133 |       expect(Array.isArray(res.body)).toBe(true);
+      134 |     });
+
+      at Object.<anonymous> (orders.e2e-spec.ts:131:10)
+      ----
+      at Test._assertStatus (../node_modules/supertest/lib/test.js:309:14)
+      at ../node_modules/supertest/lib/test.js:365:13
+      at Test._assertFunction (../node_modules/supertest/lib/test.js:342:13)
+      at Test.assert (../node_modules/supertest/lib/test.js:195:23)
+      at localAssert (../node_modules/supertest/lib/test.js:138:14)
+      at Server.<anonymous> (../node_modules/supertest/lib/test.js:152:11)
+
+  ● Orders (e2e) › PATCH /orders/:id/status (admin) › should update order status
+
+    expected 200 "OK", got 401 "Unauthorized"
+
+      141 |         .set('Authorization', `***
+      142 |         .send({ status: 'confirmed' })
+    > 143 |         .expect(200);
+          |          ^
+      144 |
+      145 |       const body = res.body as { status: string };
+      146 |       expect(body.status).toBe('confirmed');
+
+      at Object.<anonymous> (orders.e2e-spec.ts:143:10)
+      ----
+      at Test._assertStatus (../node_modules/supertest/lib/test.js:309:14)
+      at ../node_modules/supertest/lib/test.js:365:13
+      at Test._assertFunction (../node_modules/supertest/lib/test.js:342:13)
+      at Test.assert (../node_modules/supertest/lib/test.js:195:23)
+      at localAssert (../node_modules/supertest/lib/test.js:138:14)
+      at Server.<anonymous> (../node_modules/supertest/lib/test.js:152:11)
+
+  ● Orders (e2e) › DELETE /orders/:id (admin) › should delete order
+
+    expected 200 "OK", got 401 "Unauthorized"
+
+      153 |         .delete(`/orders/${orderId}`)
+      154 |         .set('Authorization', `***
+    > 155 |         .expect(200);
+          |          ^
+      156 |     });
+      157 |   });
+      158 | });
+
+      at Object.<anonymous> (orders.e2e-spec.ts:155:10)
+      ----
+      at Test._assertStatus (../node_modules/supertest/lib/test.js:309:14)
+      at ../node_modules/supertest/lib/test.js:365:13
+      at Test._assertFunction (../node_modules/supertest/lib/test.js:342:13)
+      at Test.assert (../node_modules/supertest/lib/test.js:195:23)
+      at localAssert (../node_modules/supertest/lib/test.js:138:14)
+      at Server.<anonymous> (../node_modules/supertest/lib/test.js:152:11)
+
+A worker process has failed to exit gracefully and has been force exited. This is likely caused by tests leaking due to improper teardown. Try running with --detectOpenHandles to find leaks. Active timers can also cause this, ensure that .unref() was called on them.
+Test Suites: 1 failed, 3 passed, 4 total
+Tests:       7 failed, 19 passed, 26 total
+Snapshots:   0 total
+Time:        7.784 s
+Ran all test suites.
+Force exiting Jest: Have you considered using `--detectOpenHandles` to detect async operations that kept running after all tests finished?
+Error: Process completed with exit code 1.
