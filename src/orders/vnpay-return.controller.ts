@@ -5,15 +5,15 @@ import { OrdersService } from './orders.service';
 import { ConfigService } from '@nestjs/config';
 
 @ApiTags('Orders')
-@Controller('orders')
+@Controller('orders/vnpay-return')
 export class VnpayReturnController {
   constructor(
     private readonly ordersService: OrdersService,
     private readonly cfg: ConfigService,
   ) {}
 
-  // GET /orders/vnpay-return — VNPay callback sau khi thanh toán
-  @Get('vnpay-return')
+  // GET /orders/vnpay-return — VNPay callback sau khi thanh toán (public, không cần token)
+  @Get()
   async vnpayReturn(
     @Query() query: Record<string, string>,
     @Res() res: Response,

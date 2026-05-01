@@ -28,7 +28,7 @@ export class VnpayService {
 
   createPaymentUrl(orderId: number, amount: number, ipAddr: string): string {
     const paymentUrl = this.vnpay.buildPaymentUrl({
-      vnp_Amount: amount,
+      vnp_Amount: amount * 100, // VNPay yêu cầu nhân 100
       vnp_IpAddr: ipAddr,
       vnp_TxnRef: String(orderId),
       vnp_OrderInfo: `Thanh toan don hang #${orderId}`,
