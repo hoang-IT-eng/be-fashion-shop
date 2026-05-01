@@ -8,7 +8,7 @@ Swagger UI (prod):     https://be-fashion-shop-uvp9.onrender.com/api/docs
 ================================================================
 
 
-✅ ĐÃ LÀM
+✅ ĐÃ LÀM (38 endpoints)
 ================================================================
 
 --- AUTH ---
@@ -45,6 +45,22 @@ PUT    https://be-fashion-shop-uvp9.onrender.com/products/:id
 DELETE https://be-fashion-shop-uvp9.onrender.com/products/:id
 POST   https://be-fashion-shop-uvp9.onrender.com/products/upload
 
+--- CATEGORIES ---
+GET    /categories                   Danh sách danh mục active (public)
+GET    /categories/all               Tất cả danh mục kể cả inactive 🔒 admin
+POST   /categories                   Thêm danh mục 🔒 admin
+PUT    /categories/:id               Sửa danh mục 🔒 admin
+PATCH  /categories/:id/toggle        Ẩn/hiện danh mục 🔒 admin
+DELETE /categories/:id               Xóa danh mục 🔒 admin
+
+Production:
+GET    https://be-fashion-shop-uvp9.onrender.com/categories
+GET    https://be-fashion-shop-uvp9.onrender.com/categories/all
+POST   https://be-fashion-shop-uvp9.onrender.com/categories
+PUT    https://be-fashion-shop-uvp9.onrender.com/categories/:id
+PATCH  https://be-fashion-shop-uvp9.onrender.com/categories/:id/toggle
+DELETE https://be-fashion-shop-uvp9.onrender.com/categories/:id
+
 --- USERS ---
 GET    /users/me                     Xem thông tin cá nhân 🔒
 PUT    /users/me                     Cập nhật tên 🔒
@@ -62,7 +78,7 @@ GET    https://be-fashion-shop-uvp9.onrender.com/users/:id
 PUT    https://be-fashion-shop-uvp9.onrender.com/users/:id
 DELETE https://be-fashion-shop-uvp9.onrender.com/users/:id
 
---- CART (cần JWT token) ---
+--- CART ---
 GET    /cart                         Lấy giỏ hàng của user hiện tại 🔒
 POST   /cart                         Thêm sản phẩm vào giỏ 🔒
 PUT    /cart/:itemId                 Cập nhật số lượng 🔒
@@ -75,12 +91,13 @@ PUT    https://be-fashion-shop-uvp9.onrender.com/cart/:itemId
 DELETE https://be-fashion-shop-uvp9.onrender.com/cart/:itemId
 
 --- ORDERS ---
-POST   /orders                       Tạo đơn hàng 🔒 user
+POST   /orders                       Tạo đơn hàng (COD/VNPay/Momo) 🔒 user
 GET    /orders/my                    Lịch sử đơn của user hiện tại 🔒
 GET    /orders                       Tất cả đơn hàng 🔒 admin
 GET    /orders/:id                   Chi tiết đơn hàng 🔒
 PATCH  /orders/:id/status            Cập nhật trạng thái 🔒 admin
 DELETE /orders/:id                   Hủy đơn hàng 🔒 admin
+GET    /orders/vnpay-return          VNPay callback (tự động redirect về FE)
 
 Production:
 POST   https://be-fashion-shop-uvp9.onrender.com/orders
@@ -89,6 +106,7 @@ GET    https://be-fashion-shop-uvp9.onrender.com/orders
 GET    https://be-fashion-shop-uvp9.onrender.com/orders/:id
 PATCH  https://be-fashion-shop-uvp9.onrender.com/orders/:id/status
 DELETE https://be-fashion-shop-uvp9.onrender.com/orders/:id
+GET    https://be-fashion-shop-uvp9.onrender.com/orders/vnpay-return
 
 --- DASHBOARD ---
 GET    /dashboard/stats              Thống kê tổng quan 🔒 admin
@@ -107,22 +125,11 @@ POST   https://be-fashion-shop-uvp9.onrender.com/products/:productId/reviews
 DELETE https://be-fashion-shop-uvp9.onrender.com/products/:productId/reviews/:id
 
 
-❌ CHƯA LÀM
-================================================================
-
---- CATEGORIES ---
-GET    /categories             Danh sách danh mục
-POST   /categories             Thêm danh mục (admin)
-PUT    /categories/:id         Sửa danh mục (admin)
-DELETE /categories/:id         Xóa danh mục (admin)
-PATCH  /categories/:id/toggle  Ẩn/hiện danh mục (admin)
-
-
 ================================================================
 TỔNG KẾT
 ================================================================
-Đã làm:   30 endpoints
-Chưa làm:  5 endpoints (Categories)
+Đã làm:   38 endpoints
+Chưa làm:  0 endpoints
 
 🔒 = Yêu cầu JWT token (Authorization: Bearer <token>)
 admin = Chỉ role admin mới truy cập được
@@ -143,16 +150,28 @@ POST /auth/forgot-password:
 POST /auth/reset-password:
   { "token": "uuid-token-từ-email", "newPassword": "newpass123" }
 
+POST /categories (admin):
+  { "name": "Áo thun", "imageUrl": "https://..." }
+
 POST /products (admin):
-  { "name": "Áo thun", "price": 199000, "stock": 50, "category": "ao",
+  { "name": "Áo thun basic", "price": 199000, "stock": 50, "category": "ao",
     "sizes": ["S","M","L"], "colors": ["trắng","đen"], "imageUrl": "https://..." }
 
 POST /cart:
   { "productId": 1, "name": "Áo thun", "price": 199000, "quantity": 2 }
 
-POST /orders:
+POST /orders (COD):
   { "items": [{"productId":1,"name":"Áo thun","price":199000,"quantity":2}],
-    "total": 398000, "paymentMethod": "cod" }
+    "total": 398000,
+    "shippingName": "Nguyễn Văn A",
+    "shippingPhone": "0901234567",
+    "shippingAddress": "123 Đường ABC, TP.HCM",
+    "paymentMethod": "cod" }
+
+POST /orders (VNPay):
+  { ...same as above, "paymentMethod": "vnpay" }
+  → Response: { "order": {...}, "paymentUrl": "https://sandbox.vnpayment.vn/..." }
+  → Frontend redirect user đến paymentUrl
 
 PATCH /orders/:id/status (admin):
   { "status": "confirmed" }
@@ -163,4 +182,11 @@ POST /products/:productId/reviews:
 
 PUT /users/me:
   { "name": "Tên mới" }
+
+================================================================
+PAYMENT STATUS VALUES
+================================================================
+paymentMethod: cod | vnpay | momo
+paymentStatus: unpaid | paid | failed | refunded
+orderStatus:   pending | confirmed | shipping | delivered | cancelled
 ================================================================

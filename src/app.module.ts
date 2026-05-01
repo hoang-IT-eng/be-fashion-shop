@@ -14,9 +14,11 @@ import { CartModule } from './cart/cart.module';
 import { OrdersModule } from './orders/orders.module';
 import { DashboardModule } from './dashboard/dashboard.module';
 import { ReviewsModule } from './reviews/reviews.module';
+import { CategoriesModule } from './categories/categories.module';
 import { Review } from './reviews/review.entity';
 import { CartItem } from './cart/cart.entity';
 import { Order } from './orders/order.entity';
+import { Category } from './categories/category.entity';
 
 @Module({
   imports: [
@@ -31,7 +33,7 @@ import { Order } from './orders/order.entity';
           return {
             type: 'postgres',
             url: databaseUrl,
-            entities: [User, Product, CartItem, Order, Review],
+            entities: [User, Product, CartItem, Order, Review, Category],
             synchronize: true,
             ssl: isProduction ? { rejectUnauthorized: false } : false,
             logging: false,
@@ -44,7 +46,7 @@ import { Order } from './orders/order.entity';
           username: cfg.get('DB_USERNAME', 'postgres'),
           password: cfg.get('DB_PASSWORD', '1234'),
           database: cfg.get('DB_NAME', 'fashion_shop'),
-          entities: [User, Product, CartItem, Order, Review],
+          entities: [User, Product, CartItem, Order, Review, Category],
           synchronize: true,
           logging: false,
         };
@@ -65,6 +67,7 @@ import { Order } from './orders/order.entity';
     OrdersModule,
     DashboardModule,
     ReviewsModule,
+    CategoriesModule,
   ],
   controllers: [AppController],
   providers: [AppService],

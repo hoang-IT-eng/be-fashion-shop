@@ -16,6 +16,19 @@ export enum OrderStatus {
   CANCELLED = 'cancelled',
 }
 
+export enum PaymentMethod {
+  COD = 'cod',
+  VNPAY = 'vnpay',
+  MOMO = 'momo',
+}
+
+export enum PaymentStatus {
+  UNPAID = 'unpaid',
+  PAID = 'paid',
+  FAILED = 'failed',
+  REFUNDED = 'refunded',
+}
+
 @Entity('orders')
 export class Order {
   @PrimaryGeneratedColumn()
@@ -34,9 +47,27 @@ export class Order {
   @Column({ type: 'decimal', precision: 10, scale: 2 })
   total: number;
 
-  @Column({ type: 'varchar', length: 50, default: 'cod' })
-  paymentMethod: string;
+  // Shipping address
+  @Column({ type: 'varchar', length: 255 })
+  shippingName: string;
 
+  @Column({ type: 'varchar', length: 20 })
+  shippingPhone: string;
+
+  @Column({ type: 'text' })
+  shippingAddress: string;
+
+  // Payment
+  @Column({ type: 'enum', enum: PaymentMethod, default: PaymentMethod.COD })
+  paymentMethod: PaymentMethod;
+
+  @Column({ type: 'enum', enum: PaymentStatus, default: PaymentStatus.UNPAID })
+  paymentStatus: PaymentStatus;
+
+  @Column({ type: 'varchar', length: 255, nullable: true })
+  vnpayTransactionId: string | null;
+
+  // Order status
   @Column({ type: 'enum', enum: OrderStatus, default: OrderStatus.PENDING })
   status: OrderStatus;
 
