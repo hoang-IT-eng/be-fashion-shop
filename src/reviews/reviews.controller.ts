@@ -16,13 +16,15 @@ import { CreateReviewDto } from './dto/create-review.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { User } from '../users/user.entity';
 
+import { Public } from '../auth/decorators/public.decorator';
+
 @ApiTags('Reviews')
 @Controller('products/:productId/reviews')
 export class ReviewsController {
   constructor(private readonly reviewsService: ReviewsService) {}
 
-  // GET /products/:productId/reviews → public
   @Get()
+  @Public()
   getByProduct(@Param('productId', ParseIntPipe) productId: number) {
     return this.reviewsService.getByProduct(productId);
   }

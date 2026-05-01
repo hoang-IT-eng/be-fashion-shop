@@ -28,6 +28,7 @@ import { UserRole } from '../users/user.entity';
 import { CloudinaryService } from '../cloudinary/cloudinary.service';
 
 import { ApiTags, ApiConsumes, ApiBody } from '@nestjs/swagger';
+import { Public } from '../auth/decorators/public.decorator';
 
 @ApiTags('Products')
 @Controller('products')
@@ -37,14 +38,14 @@ export class ProductsController {
     private readonly cloudinaryService: CloudinaryService,
   ) {}
 
-  // GET /products → public, có filter + pagination
   @Get()
+  @Public()
   findAll(@Query() query: QueryProductDto) {
     return this.productsService.findAll(query);
   }
 
-  // GET /products/:id → public
   @Get(':id')
+  @Public()
   findOne(@Param('id', ParseIntPipe) id: number) {
     return this.productsService.findOne(id);
   }

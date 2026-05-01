@@ -58,30 +58,33 @@ export class OrdersService {
     return this.orderRepo.save(order);
   }
 
-  async handleVnpayReturn(
-    query: Record<string, string>,
-  ): Promise<{ success: boolean; orderId: number }> {
-    const result = this.vnpayService.verifyReturn(
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      query as any,
-    );
-    const orderId = Number(query['vnp_TxnRef']);
-    const order = await this.orderRepo.findOneBy({ id: orderId });
+  async handleVnpayReturn(query: Record<string, string>): Promise<{ success: boolean; orderId: number }> {
+    try {
+      const result = this.vnpayService.verifyReturn(
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        query as any,
+      );
+      const orderId = Number(query['vnp_TxnRef']);
+      const order = await this.orderRepo.findOneBy({ id: orderId });
 
-    if (order) {
-      if (result.isVerified && query['vnp_ResponseCode'] === '00') {
-        order.paymentStatus = PaymentStatus.PAID;
-        order.vnpayTransactionId = query['vnp_TransactionNo'] ?? null;
-      } else {
-        order.paymentStatus = PaymentStatus.FAILED;
+      if (order) {
+        if (result.isVerified && query['vnp_ResponseCode'] === '00') {
+          order.paymentStatus = PaymentStatus.PAID;
+          order.vnpayTransactionId = query['vnp_TransactionNo'] ?? null;
+        } else {
+          order.paymentStatus = PaymentStatus.FAILED;
+        }
+        await this.orderRepo.save(order);
       }
-      await this.orderRepo.save(order);
-    }
 
-    return {
-      success: result.isVerified && query['vnp_ResponseCode'] === '00',
-      orderId,
-    };
+      return {
+        success: result.isVerified && query['vnp_ResponseCode'] === '00',
+        orderId,
+      };
+    } catch {
+      const orderId = Number(query['vnp_TxnRef'] ?? 0);
+      return { success: false, orderId };
+    }
   }
 
   async deleteOrder(id: number): Promise<{ message: string }> {
