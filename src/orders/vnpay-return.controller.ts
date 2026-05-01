@@ -3,6 +3,7 @@ import type { Response } from 'express';
 import { ApiTags } from '@nestjs/swagger';
 import { OrdersService } from './orders.service';
 import { ConfigService } from '@nestjs/config';
+import { Public } from '../auth/decorators/public.decorator';
 
 @ApiTags('Orders')
 @Controller('orders/vnpay-return')
@@ -12,8 +13,9 @@ export class VnpayReturnController {
     private readonly cfg: ConfigService,
   ) {}
 
-  // GET /orders/vnpay-return — VNPay callback sau khi thanh toán (public, không cần token)
+  // GET /orders/vnpay-return — VNPay callback (public, không cần token)
   @Get()
+  @Public()
   async vnpayReturn(
     @Query() query: Record<string, string>,
     @Res() res: Response,
