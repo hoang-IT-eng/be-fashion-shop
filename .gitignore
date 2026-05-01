@@ -42,6 +42,13 @@ lerna-debug.log*
 .env.production.local
 .env.local
 
+# txt files (logs, debug, notes)
+bug*.txt
+loi*.txt
+loioxpush.txt
+vnpayfe.txt
+thanhtoan.txt
+
 # temp directory
 .temp
 .tmp
