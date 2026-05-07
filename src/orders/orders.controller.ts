@@ -35,6 +35,7 @@ export class OrdersController {
     private readonly cfg: ConfigService,
   ) {}
 
+  // POST /orders → user tạo đơn
   @Post()
   createOrder(@Req() req: Request, @Body() dto: CreateOrderDto) {
     const user = req.user as User;
@@ -45,13 +46,14 @@ export class OrdersController {
     return this.ordersService.createOrder(user.id, dto, ip);
   }
 
+  // GET /orders/my → lịch sử đơn của user hiện tại
   @Get('my')
   getMyOrders(@Req() req: Request) {
     const user = req.user as User;
     return this.ordersService.getMyOrders(user.id);
   }
 
-  // VNPay callback — PHẢI đặt trước @Get(':id') để không bị match nhầm
+  // VNPay callback — PHẢI đặt trước @Get(':id')
   @Get('vnpay-return')
   @Public()
   async vnpayReturn(
@@ -66,6 +68,7 @@ export class OrdersController {
     return res.redirect(`${feUrl}/orders/${result.orderId}?payment=failed`);
   }
 
+  // GET /orders → admin xem tất cả đơn
   @Get()
   @UseGuards(RolesGuard)
   @Roles(UserRole.ADMIN)
@@ -73,11 +76,15 @@ export class OrdersController {
     return this.ordersService.getAllOrders();
   }
 
+  // GET /orders/:id → user chỉ xem đơn của mình, admin xem tất cả
   @Get(':id')
-  getOrderById(@Param('id', ParseIntPipe) id: number) {
-    return this.ordersService.getOrderById(id);
+  getOrderById(@Param('id', ParseIntPipe) id: number, @Req() req: Request) {
+    const user = req.user as User;
+    const isAdmin = user.role === UserRole.ADMIN;
+    return this.ordersService.getOrderById(id, user.id, isAdmin);
   }
 
+  // PATCH /orders/:id/status → admin cập nhật trạng thái
   @Patch(':id/status')
   @UseGuards(RolesGuard)
   @Roles(UserRole.ADMIN)
@@ -88,10 +95,18 @@ export class OrdersController {
     return this.ordersService.updateStatus(id, status);
   }
 
+  // DELETE /orders/:id/cancel → user tự hủy đơn (chỉ khi PENDING)
+  @Delete(':id/cancel')
+  cancelMyOrder(@Param('id', ParseIntPipe) id: number, @Req() req: Request) {
+    const user = req.user as User;
+    return this.ordersService.cancelMyOrder(id, user.id);
+  }
+
+  // DELETE /orders/:id → admin xóa đơn hàng
   @Delete(':id')
   @UseGuards(RolesGuard)
   @Roles(UserRole.ADMIN)
-  cancelOrder(@Param('id', ParseIntPipe) id: number) {
+  deleteOrder(@Param('id', ParseIntPipe) id: number) {
     return this.ordersService.deleteOrder(id);
   }
 }

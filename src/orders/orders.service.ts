@@ -1,4 +1,9 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  ForbiddenException,
+  BadRequestException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import {
@@ -46,24 +51,63 @@ export class OrdersService {
     return this.orderRepo.find({ order: { createdAt: 'DESC' } });
   }
 
-  async getOrderById(id: number): Promise<Order> {
+  // Lấy đơn hàng — kiểm tra ownership nếu không phải admin
+  async getOrderById(
+    id: number,
+    requestUserId?: number,
+    isAdmin = false,
+  ): Promise<Order> {
     const order = await this.orderRepo.findOneBy({ id });
     if (!order) throw new NotFoundException(`Không tìm thấy đơn hàng id=${id}`);
+    if (
+      !isAdmin &&
+      requestUserId !== undefined &&
+      order.userId !== requestUserId
+    ) {
+      throw new ForbiddenException('Bạn không có quyền xem đơn hàng này');
+    }
     return order;
   }
 
   async updateStatus(id: number, status: OrderStatus): Promise<Order> {
-    const order = await this.getOrderById(id);
+    const order = await this.orderRepo.findOneBy({ id });
+    if (!order) throw new NotFoundException(`Không tìm thấy đơn hàng id=${id}`);
     order.status = status;
     return this.orderRepo.save(order);
   }
 
-  async handleVnpayReturn(query: Record<string, string>): Promise<{ success: boolean; orderId: number }> {
+  // User tự hủy đơn — chỉ được hủy khi đang PENDING
+  async cancelMyOrder(
+    id: number,
+    userId: number,
+  ): Promise<{ message: string }> {
+    const order = await this.orderRepo.findOneBy({ id });
+    if (!order) throw new NotFoundException(`Không tìm thấy đơn hàng id=${id}`);
+    if (order.userId !== userId) {
+      throw new ForbiddenException('Bạn không có quyền hủy đơn hàng này');
+    }
+    if (order.status !== OrderStatus.PENDING) {
+      throw new BadRequestException('Chỉ có thể hủy đơn hàng đang chờ xử lý');
+    }
+    order.status = OrderStatus.CANCELLED;
+    await this.orderRepo.save(order);
+    return { message: `Đã hủy đơn hàng id=${id}` };
+  }
+
+  // Admin xóa đơn hàng
+  async deleteOrder(id: number): Promise<{ message: string }> {
+    const order = await this.orderRepo.findOneBy({ id });
+    if (!order) throw new NotFoundException(`Không tìm thấy đơn hàng id=${id}`);
+    await this.orderRepo.remove(order);
+    return { message: `Đã xóa đơn hàng id=${id}` };
+  }
+
+  async handleVnpayReturn(
+    query: Record<string, string>,
+  ): Promise<{ success: boolean; orderId: number }> {
     try {
-      const result = this.vnpayService.verifyReturn(
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        query as any,
-      );
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const result = this.vnpayService.verifyReturn(query as any);
       const orderId = Number(query['vnp_TxnRef']);
       const order = await this.orderRepo.findOneBy({ id: orderId });
 
@@ -85,11 +129,5 @@ export class OrdersService {
       const orderId = Number(query['vnp_TxnRef'] ?? 0);
       return { success: false, orderId };
     }
-  }
-
-  async deleteOrder(id: number): Promise<{ message: string }> {
-    const order = await this.getOrderById(id);
-    await this.orderRepo.remove(order);
-    return { message: `Đã hủy đơn hàng id=${id}` };
   }
 }
