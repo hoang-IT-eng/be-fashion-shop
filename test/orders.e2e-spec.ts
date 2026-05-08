@@ -10,6 +10,7 @@ describe('Orders (e2e)', () => {
   let dataSource: DataSource;
   let adminToken: string;
   let orderId: number;
+  let productId: number;
 
   beforeAll(async () => {
     const moduleFixture: TestingModule = await Test.createTestingModule({
@@ -21,8 +22,9 @@ describe('Orders (e2e)', () => {
     await app.init();
 
     dataSource = moduleFixture.get(DataSource);
-    // Xóa orders trước, sau đó users (do FK constraint)
+    // Xóa dữ liệu liên quan trước khi test
     await dataSource.query('DELETE FROM orders');
+    await dataSource.query('DELETE FROM products');
     await dataSource.query('DELETE FROM users');
 
     // Tạo admin
@@ -34,10 +36,23 @@ describe('Orders (e2e)', () => {
       .post('/auth/login')
       .send({ email: 'admin@fashionshop.com', password: 'Admin@123' });
     adminToken = (adminLogin.body as { accessToken: string }).accessToken;
+
+    // Tạo product để order đối soát giá từ DB
+    const productRes = await request(app.getHttpServer())
+      .post('/products')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({
+        name: 'Áo thun test',
+        price: 199000,
+        stock: 100,
+      })
+      .expect(201);
+    productId = (productRes.body as { id: number }).id;
   });
 
   afterAll(async () => {
     await dataSource.query('DELETE FROM orders');
+    await dataSource.query('DELETE FROM products');
     await dataSource.query('DELETE FROM users');
     await app.close();
   });
@@ -48,7 +63,9 @@ describe('Orders (e2e)', () => {
         .post('/orders')
         .set('Authorization', `Bearer ${adminToken}`)
         .send({
-          items: [{ productId: 1, name: 'Áo thun', price: 199000, quantity: 2 }],
+          items: [
+            { productId, name: 'bị bỏ qua', price: 1, quantity: 2 },
+          ],
           total: 398000,
           shippingName: 'Nguyễn Văn A',
           shippingPhone: '0901234567',
@@ -68,7 +85,9 @@ describe('Orders (e2e)', () => {
         .post('/orders')
         .set('Authorization', `Bearer ${adminToken}`)
         .send({
-          items: [{ productId: 1, name: 'Áo thun', price: 199000, quantity: 1 }],
+          items: [
+            { productId, name: 'bị bỏ qua', price: 999999, quantity: 1 },
+          ],
           total: 199000,
           shippingName: 'Nguyễn Văn A',
           shippingPhone: '0901234567',
@@ -87,7 +106,7 @@ describe('Orders (e2e)', () => {
         .post('/orders')
         .set('Authorization', `Bearer ${adminToken}`)
         .send({
-          items: [{ productId: 1, name: 'Áo', price: 100000, quantity: 1 }],
+          items: [{ productId, name: 'Áo', price: 100000, quantity: 1 }],
           total: 100000,
           paymentMethod: 'cod',
           // thiếu shippingName, shippingPhone, shippingAddress
