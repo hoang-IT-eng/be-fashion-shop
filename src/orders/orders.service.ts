@@ -5,7 +5,7 @@ import {
   BadRequestException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { In, Repository } from 'typeorm';
 import {
   Order,
   OrderStatus,
@@ -14,12 +14,15 @@ import {
 } from './order.entity';
 import { CreateOrderDto } from './dto/create-order.dto';
 import { VnpayService } from '../vnpay/vnpay.service';
+import { Product } from '../products/product.entity';
 
 @Injectable()
 export class OrdersService {
   constructor(
     @InjectRepository(Order)
     private readonly orderRepo: Repository<Order>,
+    @InjectRepository(Product)
+    private readonly productRepo: Repository<Product>,
     private readonly vnpayService: VnpayService,
   ) {}
 
@@ -28,14 +31,57 @@ export class OrdersService {
     dto: CreateOrderDto,
     ipAddr: string,
   ): Promise<{ order: Order; paymentUrl?: string }> {
-    const order = this.orderRepo.create({ ...dto, userId });
+    if (dto.items.length === 0) {
+      throw new BadRequestException('Đơn hàng phải có ít nhất 1 sản phẩm');
+    }
+
+    const productIds = [...new Set(dto.items.map((item) => item.productId))];
+    const products = await this.productRepo.findBy({ id: In(productIds) });
+    if (products.length !== productIds.length) {
+      throw new NotFoundException('Một hoặc nhiều sản phẩm không tồn tại');
+    }
+
+    const productMap = new Map(products.map((product) => [product.id, product]));
+    const normalizedItems = dto.items.map((item) => {
+      const product = productMap.get(item.productId);
+      if (!product) {
+        throw new NotFoundException(`Không tìm thấy sản phẩm id=${item.productId}`);
+      }
+
+      return {
+        productId: product.id,
+        name: product.name,
+        price: Number(product.price),
+        quantity: item.quantity,
+      };
+    });
+
+    const calculatedTotal = normalizedItems.reduce(
+      (sum, item) => sum + item.price * item.quantity,
+      0,
+    );
+    const roundedTotal = Number(calculatedTotal.toFixed(2));
+    const roundedClientTotal = Number(dto.total.toFixed(2));
+
+    if (roundedClientTotal !== roundedTotal) {
+      throw new BadRequestException(
+        'Tổng tiền không hợp lệ. Vui lòng tải lại giỏ hàng và thử lại.',
+      );
+    }
+
+    const order = this.orderRepo.create({
+      ...dto,
+      userId,
+      items: normalizedItems,
+      total: roundedTotal,
+    });
     const saved = await this.orderRepo.save(order);
 
     let paymentUrl: string | undefined;
     if (dto.paymentMethod === PaymentMethod.VNPAY) {
       paymentUrl = this.vnpayService.createPaymentUrl(
         saved.id,
-        dto.total,
+        roundedTotal,
         ipAddr,
       );
     }
