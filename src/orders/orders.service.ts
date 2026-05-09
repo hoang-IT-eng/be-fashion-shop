@@ -112,7 +112,11 @@ export class OrdersService {
       const orderSaved = await orderRepo.save(order);
 
       for (const item of normalizedItems) {
-        await productRepo.decrement({ id: item.productId }, 'stock', item.quantity);
+        await productRepo.decrement(
+          { id: item.productId },
+          'stock',
+          item.quantity,
+        );
       }
 
       return orderSaved;
@@ -168,9 +172,16 @@ export class OrdersService {
     }
 
     // Khôi phục stock nếu admin hủy đơn
-    if (status === OrderStatus.CANCELLED && order.status !== OrderStatus.CANCELLED) {
+    if (
+      status === OrderStatus.CANCELLED &&
+      order.status !== OrderStatus.CANCELLED
+    ) {
       for (const item of order.items) {
-        await this.productRepo.increment({ id: item.productId }, 'stock', item.quantity);
+        await this.productRepo.increment(
+          { id: item.productId },
+          'stock',
+          item.quantity,
+        );
       }
     }
 
@@ -193,7 +204,11 @@ export class OrdersService {
     }
     // Khôi phục stock
     for (const item of order.items) {
-      await this.productRepo.increment({ id: item.productId }, 'stock', item.quantity);
+      await this.productRepo.increment(
+        { id: item.productId },
+        'stock',
+        item.quantity,
+      );
     }
     order.status = OrderStatus.CANCELLED;
     await this.orderRepo.save(order);
@@ -208,7 +223,11 @@ export class OrdersService {
     // Đơn đã hủy đã được hoàn stock khi chuyển sang CANCELLED
     if (order.status !== OrderStatus.CANCELLED) {
       for (const item of order.items) {
-        await this.productRepo.increment({ id: item.productId }, 'stock', item.quantity);
+        await this.productRepo.increment(
+          { id: item.productId },
+          'stock',
+          item.quantity,
+        );
       }
     }
 
