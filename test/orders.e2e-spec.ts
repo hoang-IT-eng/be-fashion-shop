@@ -152,6 +152,93 @@ describe('Orders (e2e)', () => {
       const body = res.body as { status: string };
       expect(body.status).toBe('confirmed');
     });
+
+    it('should reject invalid transition from delivered back to pending', async () => {
+      const createRes = await request(app.getHttpServer())
+        .post('/orders')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({
+          items: [{ productId, name: 'x', price: 1, quantity: 1 }],
+          total: 199000,
+          shippingName: 'A',
+          shippingPhone: '0900000000',
+          shippingAddress: 'Addr',
+          paymentMethod: 'cod',
+        })
+        .expect(201);
+
+      const id = (createRes.body as { order: { id: number } }).order.id;
+
+      for (const status of ['confirmed', 'shipping', 'delivered'] as const) {
+        await request(app.getHttpServer())
+          .patch(`/orders/${id}/status`)
+          .set('Authorization', `Bearer ${adminToken}`)
+          .send({ status })
+          .expect(200);
+      }
+
+      await request(app.getHttpServer())
+        .patch(`/orders/${id}/status`)
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({ status: 'pending' })
+        .expect(400);
+
+      await request(app.getHttpServer())
+        .delete(`/orders/${id}`)
+        .set('Authorization', `Bearer ${adminToken}`)
+        .expect(200);
+    });
+  });
+
+  describe('Stock', () => {
+    it('should decrement stock after placing order', async () => {
+      const lowStockRes = await request(app.getHttpServer())
+        .post('/products')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({ name: 'Low stock item', price: 50000, stock: 10 })
+        .expect(201);
+      const lowId = (lowStockRes.body as { id: number }).id;
+
+      await request(app.getHttpServer())
+        .post('/orders')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({
+          items: [{ productId: lowId, name: 'x', price: 1, quantity: 3 }],
+          total: 150000,
+          shippingName: 'A',
+          shippingPhone: '0900000000',
+          shippingAddress: 'Addr',
+          paymentMethod: 'cod',
+        })
+        .expect(201);
+
+      const p = await request(app.getHttpServer())
+        .get(`/products/${lowId}`)
+        .expect(200);
+      expect((p.body as { stock: number }).stock).toBe(7);
+    });
+
+    it('should return 400 when stock is insufficient', async () => {
+      const pRes = await request(app.getHttpServer())
+        .post('/products')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({ name: 'One left', price: 10000, stock: 1 })
+        .expect(201);
+      const pid = (pRes.body as { id: number }).id;
+
+      await request(app.getHttpServer())
+        .post('/orders')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({
+          items: [{ productId: pid, name: 'x', price: 1, quantity: 2 }],
+          total: 20000,
+          shippingName: 'A',
+          shippingPhone: '0900000000',
+          shippingAddress: 'Addr',
+          paymentMethod: 'cod',
+        })
+        .expect(400);
+    });
   });
 
   describe('DELETE /orders/:id (admin)', () => {
