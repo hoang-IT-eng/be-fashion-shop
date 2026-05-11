@@ -22,7 +22,7 @@ export class CartItem {
   @Column()
   productId: number;
 
-  @Column({ nullable: true })
+  @Column({ type: 'int', nullable: true })
   variantId: number | null;
 
   @Column({ type: 'varchar', length: 50, nullable: true })
