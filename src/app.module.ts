@@ -17,6 +17,7 @@ import { DashboardModule } from './dashboard/dashboard.module';
 import { ReviewsModule } from './reviews/reviews.module';
 import { CategoriesModule } from './categories/categories.module';
 import { JwtAuthGuard } from './auth/guards/jwt-auth.guard';
+import { ProductVariant } from './products/product-variant.entity';
 import { Review } from './reviews/review.entity';
 import { CartItem } from './cart/cart.entity';
 import { Order } from './orders/order.entity';
@@ -35,7 +36,15 @@ import { Category } from './categories/category.entity';
           return {
             type: 'postgres',
             url: databaseUrl,
-            entities: [User, Product, CartItem, Order, Review, Category],
+            entities: [
+              User,
+              Product,
+              ProductVariant,
+              CartItem,
+              Order,
+              Review,
+              Category,
+            ],
             synchronize: true,
             ssl: isProduction ? { rejectUnauthorized: false } : false,
             logging: false,
@@ -48,7 +57,15 @@ import { Category } from './categories/category.entity';
           username: cfg.get('DB_USERNAME', 'postgres'),
           password: cfg.get('DB_PASSWORD', '1234'),
           database: cfg.get('DB_NAME', 'fashion_shop'),
-          entities: [User, Product, CartItem, Order, Review, Category],
+          entities: [
+            User,
+            Product,
+            ProductVariant,
+            CartItem,
+            Order,
+            Review,
+            Category,
+          ],
           synchronize: true,
           logging: false,
         };

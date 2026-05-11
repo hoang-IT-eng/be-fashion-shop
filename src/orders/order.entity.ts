@@ -42,7 +42,15 @@ export class Order {
   user: User;
 
   @Column({ type: 'json' })
-  items: { productId: number; name: string; price: number; quantity: number }[];
+  items: {
+    productId: number;
+    variantId?: number;
+    size?: string;
+    color?: string;
+    name: string;
+    price: number;
+    quantity: number;
+  }[];
 
   @Column({ type: 'decimal', precision: 10, scale: 2 })
   total: number;

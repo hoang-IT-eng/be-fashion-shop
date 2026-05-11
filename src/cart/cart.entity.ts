@@ -22,6 +22,15 @@ export class CartItem {
   @Column()
   productId: number;
 
+  @Column({ nullable: true })
+  variantId: number | null;
+
+  @Column({ type: 'varchar', length: 50, nullable: true })
+  size: string | null;
+
+  @Column({ type: 'varchar', length: 50, nullable: true })
+  color: string | null;
+
   @Column({ type: 'varchar', length: 255 })
   name: string;
 

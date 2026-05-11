@@ -3,16 +3,29 @@ import {
   IsEnum,
   IsNotEmpty,
   IsNumber,
+  IsOptional,
   IsPositive,
   IsString,
   ValidateNested,
-  IsPhoneNumber,
 } from 'class-validator';
 import { Type } from 'class-transformer';
 import { PaymentMethod } from '../order.entity';
 
 export class OrderItemDto {
   @IsNumber() productId: number;
+
+  @IsOptional()
+  @IsNumber()
+  variantId?: number;
+
+  @IsOptional()
+  @IsString()
+  size?: string;
+
+  @IsOptional()
+  @IsString()
+  color?: string;
+
   @IsString() @IsNotEmpty() name: string;
   @IsNumber() @IsPositive() price: number;
   @IsNumber() @IsPositive() quantity: number;

@@ -15,6 +15,7 @@ import {
 import { CreateOrderDto } from './dto/create-order.dto';
 import { VnpayService } from '../vnpay/vnpay.service';
 import { Product } from '../products/product.entity';
+import { ProductVariant } from '../products/product-variant.entity';
 
 // Workflow hợp lệ: từ trạng thái hiện tại có thể chuyển sang trạng thái nào
 const VALID_TRANSITIONS: Record<OrderStatus, OrderStatus[]> = {
@@ -33,6 +34,8 @@ export class OrdersService {
     private readonly orderRepo: Repository<Order>,
     @InjectRepository(Product)
     private readonly productRepo: Repository<Product>,
+    @InjectRepository(ProductVariant)
+    private readonly variantRepo: Repository<ProductVariant>,
     private readonly vnpayService: VnpayService,
   ) {}
 
@@ -49,6 +52,7 @@ export class OrdersService {
 
     const saved = await this.dataSource.transaction(async (manager) => {
       const productRepo = manager.getRepository(Product);
+      const variantRepo = manager.getRepository(ProductVariant);
       const orderRepo = manager.getRepository(Order);
 
       const products = await productRepo.find({
@@ -61,21 +65,44 @@ export class OrdersService {
 
       const productMap = new Map(products.map((p) => [p.id, p]));
 
+      // Tổng hợp số lượng theo variant hoặc product
+      const qtyByVariant = new Map<number, number>();
       const qtyByProduct = new Map<number, number>();
+
       for (const item of dto.items) {
-        qtyByProduct.set(
-          item.productId,
-          (qtyByProduct.get(item.productId) ?? 0) + item.quantity,
-        );
-      }
-      for (const [pid, totalQty] of qtyByProduct) {
-        const p = productMap.get(pid);
-        if (!p) {
-          throw new NotFoundException(`Không tìm thấy sản phẩm id=${pid}`);
+        if (item.variantId) {
+          qtyByVariant.set(
+            item.variantId,
+            (qtyByVariant.get(item.variantId) ?? 0) + item.quantity,
+          );
+        } else {
+          qtyByProduct.set(
+            item.productId,
+            (qtyByProduct.get(item.productId) ?? 0) + item.quantity,
+          );
         }
-        if (p.stock < totalQty) {
+      }
+
+      // Kiểm tra stock variant
+      for (const [vid, qty] of qtyByVariant) {
+        const variant = await variantRepo.findOneBy({ id: vid });
+        if (!variant)
+          throw new NotFoundException(`Không tìm thấy variant id=${vid}`);
+        if (variant.stock < qty) {
           throw new BadRequestException(
-            `Sản phẩm "${p.name}" chỉ còn ${p.stock} trong kho (yêu cầu ${totalQty})`,
+            `Variant id=${vid} chỉ còn ${variant.stock} trong kho (yêu cầu ${qty})`,
+          );
+        }
+      }
+
+      // Kiểm tra stock product (không có variant)
+      for (const [pid, qty] of qtyByProduct) {
+        const p = productMap.get(pid);
+        if (!p)
+          throw new NotFoundException(`Không tìm thấy sản phẩm id=${pid}`);
+        if (p.stock < qty) {
+          throw new BadRequestException(
+            `Sản phẩm "${p.name}" chỉ còn ${p.stock} trong kho (yêu cầu ${qty})`,
           );
         }
       }
@@ -84,6 +111,9 @@ export class OrdersService {
         const product = productMap.get(item.productId)!;
         return {
           productId: product.id,
+          variantId: item.variantId,
+          size: item.size,
+          color: item.color,
           name: product.name,
           price: Number(product.price),
           quantity: item.quantity,
@@ -111,8 +141,12 @@ export class OrdersService {
       });
       const orderSaved = await orderRepo.save(order);
 
-      for (const item of normalizedItems) {
-        await productRepo.decrement({ id: item.productId }, 'stock', item.quantity);
+      // Trừ stock
+      for (const [vid, qty] of qtyByVariant) {
+        await variantRepo.decrement({ id: vid }, 'stock', qty);
+      }
+      for (const [pid, qty] of qtyByProduct) {
+        await productRepo.decrement({ id: pid }, 'stock', qty);
       }
 
       return orderSaved;
@@ -168,9 +202,24 @@ export class OrdersService {
     }
 
     // Khôi phục stock nếu admin hủy đơn
-    if (status === OrderStatus.CANCELLED && order.status !== OrderStatus.CANCELLED) {
+    if (
+      status === OrderStatus.CANCELLED &&
+      order.status !== OrderStatus.CANCELLED
+    ) {
       for (const item of order.items) {
-        await this.productRepo.increment({ id: item.productId }, 'stock', item.quantity);
+        if (item.variantId) {
+          await this.variantRepo.increment(
+            { id: item.variantId },
+            'stock',
+            item.quantity,
+          );
+        } else {
+          await this.productRepo.increment(
+            { id: item.productId },
+            'stock',
+            item.quantity,
+          );
+        }
       }
     }
 
@@ -193,7 +242,19 @@ export class OrdersService {
     }
     // Khôi phục stock
     for (const item of order.items) {
-      await this.productRepo.increment({ id: item.productId }, 'stock', item.quantity);
+      if (item.variantId) {
+        await this.variantRepo.increment(
+          { id: item.variantId },
+          'stock',
+          item.quantity,
+        );
+      } else {
+        await this.productRepo.increment(
+          { id: item.productId },
+          'stock',
+          item.quantity,
+        );
+      }
     }
     order.status = OrderStatus.CANCELLED;
     await this.orderRepo.save(order);
@@ -208,7 +269,19 @@ export class OrdersService {
     // Đơn đã hủy đã được hoàn stock khi chuyển sang CANCELLED
     if (order.status !== OrderStatus.CANCELLED) {
       for (const item of order.items) {
-        await this.productRepo.increment({ id: item.productId }, 'stock', item.quantity);
+        if (item.variantId) {
+          await this.variantRepo.increment(
+            { id: item.variantId },
+            'stock',
+            item.quantity,
+          );
+        } else {
+          await this.productRepo.increment(
+            { id: item.productId },
+            'stock',
+            item.quantity,
+          );
+        }
       }
     }
 
