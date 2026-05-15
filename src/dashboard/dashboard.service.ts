@@ -16,6 +16,13 @@ export class DashboardService {
     private readonly orderRepo: Repository<Order>,
   ) {}
 
+  async getLatest2Orders(): Promise<Order[]> {
+    return this.orderRepo.find({
+      order: { createdAt: 'DESC' },
+      take: 1,
+    });
+  }
+
   async getStats() {
     const [totalUsers, totalProducts, totalOrders, orders] = await Promise.all([
       this.userRepo.count(),
@@ -58,5 +65,30 @@ export class DashboardService {
       newOrdersToday,
       ordersByStatus,
     };
+  }
+
+  async getRevenueByMonth(year: number) {
+    const orders = await this.orderRepo
+      .createQueryBuilder('order')
+      .where('EXTRACT(YEAR FROM order.createdAt) = :year', { year })
+      .andWhere('order.status != :cancelled', {
+        cancelled: OrderStatus.CANCELLED,
+      })
+      .getMany();
+
+    // Khởi tạo mảng 12 tháng với revenue = 0
+    const monthly = Array.from({ length: 12 }, (_, i) => ({
+      month: i + 1,
+      revenue: 0,
+      orders: 0,
+    }));
+
+    for (const order of orders) {
+      const month = new Date(order.createdAt).getMonth(); // 0-indexed
+      monthly[month].revenue += Number(order.total);
+      monthly[month].orders += 1;
+    }
+
+    return { year, data: monthly };
   }
 }

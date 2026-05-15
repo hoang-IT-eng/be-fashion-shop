@@ -1,4 +1,4 @@
-import { Controller, Get, UseGuards } from '@nestjs/common';
+import { Controller, Get, Query, UseGuards } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
 import { DashboardService } from './dashboard.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -18,5 +18,18 @@ export class DashboardController {
   @Get('stats')
   getStats() {
     return this.dashboardService.getStats();
+  }
+
+  // GET /dashboard/latest-orders
+  @Get('latest-orders')
+  getLatest2Orders() {
+    return this.dashboardService.getLatest2Orders();
+  }
+
+  // GET /dashboard/revenue?year=2026
+  @Get('revenue')
+  getRevenueByMonth(@Query('year') year?: string) {
+    const y = year ? parseInt(year, 10) : new Date().getFullYear();
+    return this.dashboardService.getRevenueByMonth(y);
   }
 }
