@@ -4,7 +4,9 @@ import {
   Column,
   CreateDateColumn,
   UpdateDateColumn,
+  OneToMany,
 } from 'typeorm';
+import { ProductVariant } from './product-variant.entity';
 
 @Entity('products')
 export class Product {
@@ -37,6 +39,11 @@ export class Product {
 
   @Column({ default: true })
   isActive: boolean;
+
+  @OneToMany(() => ProductVariant, (variant) => variant.product, {
+    cascade: true,
+  })
+  variants: ProductVariant[];
 
   @CreateDateColumn()
   createdAt: Date;

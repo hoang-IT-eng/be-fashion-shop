@@ -17,9 +17,11 @@ export class CartService {
   }
 
   async addToCart(userId: number, dto: AddToCartDto): Promise<CartItem> {
+    // Tìm item trùng: cùng productId + variantId (nếu có)
     const existing = await this.cartRepo.findOneBy({
       userId,
       productId: dto.productId,
+      variantId: dto.variantId ?? (null as unknown as undefined),
     });
 
     if (existing) {
@@ -27,7 +29,13 @@ export class CartService {
       return this.cartRepo.save(existing);
     }
 
-    const item = this.cartRepo.create({ ...dto, userId });
+    const item = this.cartRepo.create({
+      ...dto,
+      userId,
+      variantId: dto.variantId ?? null,
+      size: dto.size ?? null,
+      color: dto.color ?? null,
+    });
     return this.cartRepo.save(item);
   }
 

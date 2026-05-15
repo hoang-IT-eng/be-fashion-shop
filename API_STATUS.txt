@@ -46,7 +46,9 @@ DELETE https://be-fashion-shop-uvp9.onrender.com/products/:id
 POST   https://be-fashion-shop-uvp9.onrender.com/products/upload
 
 --- CATEGORIES ---
-GET    /categories                   Danh sách danh mục active (public)
+GET    
+
+                Danh sách danh mục active (public)
 GET    /categories/all               Tất cả danh mục kể cả inactive 🔒 admin
 POST   /categories                   Thêm danh mục 🔒 admin
 PUT    /categories/:id               Sửa danh mục 🔒 admin

@@ -5,9 +5,13 @@ import { OrdersService } from './orders.service';
 import { Order } from './order.entity';
 import { VnpayModule } from '../vnpay/vnpay.module';
 import { Product } from '../products/product.entity';
+import { ProductVariant } from '../products/product-variant.entity';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([Order, Product]), VnpayModule],
+  imports: [
+    TypeOrmModule.forFeature([Order, Product, ProductVariant]),
+    VnpayModule,
+  ],
   controllers: [OrdersController],
   providers: [OrdersService],
 })
