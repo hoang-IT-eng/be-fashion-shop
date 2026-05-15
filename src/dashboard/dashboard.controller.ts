@@ -29,7 +29,7 @@ export class DashboardController {
   // GET /dashboard/revenue?year=2026
   @Get('revenue')
   getRevenueByMonth(@Query('year') year?: string) {
-    const y = year ? parseInt(year, 10) : new Date().getFullYear();
+    const y = this.dashboardService.parseYear(year);
     return this.dashboardService.getRevenueByMonth(y);
   }
 }

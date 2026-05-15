@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { User } from '../users/user.entity';
@@ -19,7 +19,7 @@ export class DashboardService {
   async getLatest2Orders(): Promise<Order[]> {
     return this.orderRepo.find({
       order: { createdAt: 'DESC' },
-      take: 1,
+      take: 2,
     });
   }
 
@@ -68,27 +68,44 @@ export class DashboardService {
   }
 
   async getRevenueByMonth(year: number) {
+    const start = new Date(year, 0, 1);
+    const end = new Date(year + 1, 0, 1);
+
     const orders = await this.orderRepo
       .createQueryBuilder('order')
-      .where('EXTRACT(YEAR FROM order.createdAt) = :year', { year })
+      .where('order.createdAt >= :start', { start })
+      .andWhere('order.createdAt < :end', { end })
       .andWhere('order.status != :cancelled', {
         cancelled: OrderStatus.CANCELLED,
       })
       .getMany();
 
-    // Khởi tạo mảng 12 tháng với revenue = 0
-    const monthly = Array.from({ length: 12 }, (_, i) => ({
+    const months = Array.from({ length: 12 }, (_, i) => ({
       month: i + 1,
       revenue: 0,
-      orders: 0,
+      orderCount: 0,
     }));
 
     for (const order of orders) {
-      const month = new Date(order.createdAt).getMonth(); // 0-indexed
-      monthly[month].revenue += Number(order.total);
-      monthly[month].orders += 1;
+      const monthIndex = new Date(order.createdAt).getMonth();
+      months[monthIndex].revenue += Number(order.total);
+      months[monthIndex].orderCount += 1;
     }
 
-    return { year, data: monthly };
+    months.forEach((m) => {
+      m.revenue = Number(m.revenue.toFixed(2));
+    });
+
+    return { year, months };
+  }
+
+  parseYear(year?: string): number {
+    const y = year ? parseInt(year, 10) : new Date().getFullYear();
+    if (Number.isNaN(y) || y < 2000 || y > 2100) {
+      throw new BadRequestException(
+        'Tham số year không hợp lệ (ví dụ: year=2026)',
+      );
+    }
+    return y;
   }
 }
