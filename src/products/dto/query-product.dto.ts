@@ -12,6 +12,18 @@ export class QueryProductDto {
 
   @IsOptional()
   @IsNumber()
+  @Min(0, { message: 'minPrice phải >= 0' })
+  @Type(() => Number)
+  minPrice?: number;
+
+  @IsOptional()
+  @IsNumber()
+  @Min(0, { message: 'maxPrice phải >= 0' })
+  @Type(() => Number)
+  maxPrice?: number;
+
+  @IsOptional()
+  @IsNumber()
   @Min(1)
   @Type(() => Number)
   page?: number = 1;
