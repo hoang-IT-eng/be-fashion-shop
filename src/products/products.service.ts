@@ -32,9 +32,7 @@ export class ProductsService {
       maxPrice !== undefined &&
       minPrice > maxPrice
     ) {
-      throw new BadRequestException(
-        'minPrice không được lớn hơn maxPrice',
-      );
+      throw new BadRequestException('minPrice không được lớn hơn maxPrice');
     }
 
     const qb = this.productRepo.createQueryBuilder('product');
@@ -83,5 +81,19 @@ export class ProductsService {
     const product = await this.findOne(id);
     await this.productRepo.remove(product);
     return { message: `Đã xóa sản phẩm id=${id} thành công` };
+  }
+
+  async findRelated(id: number, limit = 4): Promise<Product[]> {
+    const product = await this.findOne(id);
+    if (!product.category) return [];
+
+    return this.productRepo
+      .createQueryBuilder('product')
+      .where('product.category = :category', { category: product.category })
+      .andWhere('product.id != :id', { id })
+      .andWhere('product.isActive = true')
+      .orderBy('RANDOM()')
+      .take(limit)
+      .getMany();
   }
 }

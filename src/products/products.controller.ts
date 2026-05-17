@@ -44,6 +44,13 @@ export class ProductsController {
     return this.productsService.findAll(query);
   }
 
+  // GET /products/:id/related → public, sản phẩm cùng category
+  @Get(':id/related')
+  @Public()
+  findRelated(@Param('id', ParseIntPipe) id: number) {
+    return this.productsService.findRelated(id);
+  }
+
   @Get(':id')
   @Public()
   findOne(@Param('id', ParseIntPipe) id: number) {
