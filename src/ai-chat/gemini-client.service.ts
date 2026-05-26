@@ -8,10 +8,21 @@ import { StyleProfile } from './entities/style-profile.entity';
 @Injectable()
 export class GeminiClientService {
   private readonly logger = new Logger(GeminiClientService.name);
-  private readonly genAi: GoogleGenerativeAI;
   private readonly modelName: string;
 
   constructor(private readonly configService: ConfigService) {
+    this.modelName = this.configService.get<string>(
+      'GEMINI_MODEL',
+      'gemini-1.5-flash',
+    );
+  }
+
+  /**
+   * Returns a GoogleGenerativeAI instance with a valid API key.
+   * Throws only when actually called (lazy validation), so the service
+   * can be instantiated in tests without a real key.
+   */
+  private getClient(): GoogleGenerativeAI {
     const apiKey =
       this.configService.get<string>('GEMINI_API_KEY') ??
       this.configService.get<string>('gemini_api');
@@ -20,19 +31,14 @@ export class GeminiClientService {
         'Missing GEMINI_API_KEY. Please set this variable in your environment.',
       );
     }
-
-    this.genAi = new GoogleGenerativeAI(apiKey);
-    this.modelName = this.configService.get<string>(
-      'GEMINI_MODEL',
-      'gemini-1.5-flash',
-    );
+    return new GoogleGenerativeAI(apiKey);
   }
 
   async extractProductFilters(
     userMessage: string,
     styleProfile?: StyleProfile | null,
   ): Promise<ProductSearchFilters> {
-    const model = this.genAi.getGenerativeModel({
+    const model = this.getClient().getGenerativeModel({
       model: this.modelName,
       tools: [
         {
@@ -127,7 +133,9 @@ export class GeminiClientService {
     ].join('\n');
 
     try {
-      const model = this.genAi.getGenerativeModel({ model: this.modelName });
+      const model = this.getClient().getGenerativeModel({
+        model: this.modelName,
+      });
       const result = await model.generateContent(prompt);
       const text = result.response.text().trim();
       return text || 'Đây là các sản phẩm phù hợp gu của bạn!';
@@ -160,12 +168,16 @@ export class GeminiClientService {
       'color',
     ];
 
-    if (shoppingKeywords.some((keyword) => normalizedMessage.includes(keyword))) {
+    if (
+      shoppingKeywords.some((keyword) => normalizedMessage.includes(keyword))
+    ) {
       return true;
     }
 
     try {
-      const model = this.genAi.getGenerativeModel({ model: this.modelName });
+      const model = this.getClient().getGenerativeModel({
+        model: this.modelName,
+      });
       const prompt = [
         'Classify the user message intent.',
         'Return exactly one word: SHOPPING or GENERAL.',
@@ -184,7 +196,9 @@ export class GeminiClientService {
 
   async generateGeneralMessage(userMessage: string): Promise<string> {
     try {
-      const model = this.genAi.getGenerativeModel({ model: this.modelName });
+      const model = this.getClient().getGenerativeModel({
+        model: this.modelName,
+      });
       const prompt = [
         'You are a friendly shopping assistant.',
         'Reply in the same language as the user.',
@@ -194,7 +208,10 @@ export class GeminiClientService {
       ].join('\n');
       const result = await model.generateContent(prompt);
       const text = result.response.text().trim();
-      return text || 'Xin chào! Mình có thể giúp bạn tìm đồ theo style, màu hoặc mức giá bạn muốn.';
+      return (
+        text ||
+        'Xin chào! Mình có thể giúp bạn tìm đồ theo style, màu hoặc mức giá bạn muốn.'
+      );
     } catch (error) {
       this.logger.error('Failed to generate general message', error);
       return 'Xin chào! Mình có thể giúp bạn tìm đồ theo style, màu hoặc mức giá bạn muốn.';
