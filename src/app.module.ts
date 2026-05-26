@@ -22,6 +22,10 @@ import { Review } from './reviews/review.entity';
 import { CartItem } from './cart/cart.entity';
 import { Order } from './orders/order.entity';
 import { Category } from './categories/category.entity';
+import { AiChatModule } from './ai-chat/ai-chat.module';
+import { ChatSession } from './ai-chat/entities/chat-session.entity';
+import { ChatMessage } from './ai-chat/entities/chat-message.entity';
+import { StyleProfile } from './ai-chat/entities/style-profile.entity';
 
 @Module({
   imports: [
@@ -44,6 +48,9 @@ import { Category } from './categories/category.entity';
               Order,
               Review,
               Category,
+              ChatSession,
+              ChatMessage,
+              StyleProfile,
             ],
             synchronize: true,
             ssl: isProduction ? { rejectUnauthorized: false } : false,
@@ -65,6 +72,9 @@ import { Category } from './categories/category.entity';
             Order,
             Review,
             Category,
+            ChatSession,
+            ChatMessage,
+            StyleProfile,
           ],
           synchronize: true,
           logging: false,
@@ -87,6 +97,7 @@ import { Category } from './categories/category.entity';
     DashboardModule,
     ReviewsModule,
     CategoriesModule,
+    AiChatModule,
   ],
   controllers: [AppController],
   providers: [

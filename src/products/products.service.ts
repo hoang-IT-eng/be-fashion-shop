@@ -96,4 +96,61 @@ export class ProductsService {
       .take(limit)
       .getMany();
   }
+
+  async searchForAi(filters: {
+    category?: string;
+    color?: string;
+    style?: string;
+    minPrice?: number;
+    maxPrice?: number;
+    keywords?: string[];
+    limit?: number;
+  }): Promise<Product[]> {
+    const qb = this.productRepo
+      .createQueryBuilder('product')
+      .where('product.isActive = true')
+      .andWhere('product.stock > 0');
+
+    if (filters.category) {
+      qb.andWhere('product.category ILIKE :category', {
+        category: `%${filters.category}%`,
+      });
+    }
+
+    if (filters.color) {
+      qb.andWhere('product.colors ILIKE :color', {
+        color: `%${filters.color}%`,
+      });
+    }
+
+    if (filters.minPrice !== undefined) {
+      qb.andWhere('product.price >= :minPrice', { minPrice: filters.minPrice });
+    }
+
+    if (filters.maxPrice !== undefined) {
+      qb.andWhere('product.price <= :maxPrice', { maxPrice: filters.maxPrice });
+    }
+
+    const searchableTerms = [
+      filters.style,
+      ...(filters.keywords ?? []),
+    ].filter(Boolean) as string[];
+
+    if (searchableTerms.length > 0) {
+      qb.andWhere(
+        searchableTerms
+          .map(
+            (_, idx) =>
+              `(product.name ILIKE :term${idx} OR product.description ILIKE :term${idx} OR product.category ILIKE :term${idx})`,
+          )
+          .join(' OR '),
+        Object.fromEntries(
+          searchableTerms.map((term, idx) => [`term${idx}`, `%${term}%`]),
+        ),
+      );
+    }
+
+    const limit = filters.limit ?? 20;
+    return qb.orderBy('product.createdAt', 'DESC').take(limit).getMany();
+  }
 }
