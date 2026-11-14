@@ -9,12 +9,16 @@ import { Product } from './product.entity';
 import { CreateProductDto } from './dto/create-product.dto';
 import { UpdateProductDto } from './dto/update-product.dto';
 import { QueryProductDto } from './dto/query-product.dto';
+import { RedisCacheService } from '../cache/redis-cache.service';
+
+const PRODUCTS_LIST_PREFIX = 'cache:products:list:';
 
 @Injectable()
 export class ProductsService {
   constructor(
     @InjectRepository(Product)
     private readonly productRepo: Repository<Product>,
+    private readonly cache: RedisCacheService,
   ) {}
 
   async findAll(query: QueryProductDto) {
@@ -34,6 +38,24 @@ export class ProductsService {
     ) {
       throw new BadRequestException('minPrice không được lớn hơn maxPrice');
     }
+
+    const cacheKey = `${PRODUCTS_LIST_PREFIX}${JSON.stringify({
+      search: search ?? null,
+      category: category ?? null,
+      minPrice: minPrice ?? null,
+      maxPrice: maxPrice ?? null,
+      page,
+      limit,
+    })}`;
+
+    const cached = await this.cache.get<{
+      data: Product[];
+      total: number;
+      page: number;
+      limit: number;
+      totalPages: number;
+    }>(cacheKey);
+    if (cached) return cached;
 
     const qb = this.productRepo.createQueryBuilder('product');
 
@@ -56,7 +78,15 @@ export class ProductsService {
 
     const [data, total] = await qb.getManyAndCount();
 
-    return { data, total, page, limit, totalPages: Math.ceil(total / limit) };
+    const result = {
+      data,
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit),
+    };
+    await this.cache.set(cacheKey, result);
+    return result;
   }
 
   async findOne(id: number): Promise<Product> {
@@ -68,18 +98,23 @@ export class ProductsService {
 
   async create(dto: CreateProductDto): Promise<Product> {
     const product = this.productRepo.create(dto);
-    return this.productRepo.save(product);
+    const saved = await this.productRepo.save(product);
+    await this.cache.delByPrefix(PRODUCTS_LIST_PREFIX);
+    return saved;
   }
 
   async update(id: number, dto: UpdateProductDto): Promise<Product> {
     const product = await this.findOne(id);
     Object.assign(product, dto);
-    return this.productRepo.save(product);
+    const saved = await this.productRepo.save(product);
+    await this.cache.delByPrefix(PRODUCTS_LIST_PREFIX);
+    return saved;
   }
 
   async remove(id: number): Promise<{ message: string }> {
     const product = await this.findOne(id);
     await this.productRepo.remove(product);
+    await this.cache.delByPrefix(PRODUCTS_LIST_PREFIX);
     return { message: `Đã xóa sản phẩm id=${id} thành công` };
   }
 

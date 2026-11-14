@@ -26,57 +26,65 @@ import { AiChatModule } from './ai-chat/ai-chat.module';
 import { ChatSession } from './ai-chat/entities/chat-session.entity';
 import { ChatMessage } from './ai-chat/entities/chat-message.entity';
 import { StyleProfile } from './ai-chat/entities/style-profile.entity';
+import { CacheModule } from './cache/cache.module';
+import { HealthModule } from './health/health.module';
+
+const ENTITIES = [
+  User,
+  Product,
+  ProductVariant,
+  CartItem,
+  Order,
+  Review,
+  Category,
+  ChatSession,
+  ChatMessage,
+  StyleProfile,
+];
+
+/**
+ * Schema sync flag.
+ * Default true for free-tier / local DX (no migration runner required yet).
+ * Set TYPEORM_SYNCHRONIZE=false once you adopt migrations (see src/migrations/README.md).
+ * synchronize never drops columns/tables unexpectedly for additive changes, but
+ * still avoid relying on it for production schema ownership long-term.
+ */
+function resolveSynchronize(cfg: ConfigService): boolean {
+  const raw = cfg.get<string>('TYPEORM_SYNCHRONIZE');
+  if (raw === undefined || raw === null || raw === '') return true;
+  return !['false', '0', 'no', 'off'].includes(raw.toLowerCase());
+}
 
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
+    CacheModule,
 
     TypeOrmModule.forRootAsync({
       imports: [ConfigModule],
       useFactory: (cfg: ConfigService) => {
         const databaseUrl = cfg.get<string>('DATABASE_URL');
         const isProduction = cfg.get('NODE_ENV') === 'production';
+        const synchronize = resolveSynchronize(cfg);
         if (databaseUrl) {
           return {
-            type: 'postgres',
+            type: 'postgres' as const,
             url: databaseUrl,
-            entities: [
-              User,
-              Product,
-              ProductVariant,
-              CartItem,
-              Order,
-              Review,
-              Category,
-              ChatSession,
-              ChatMessage,
-              StyleProfile,
-            ],
-            synchronize: true,
+            entities: ENTITIES,
+            synchronize,
             ssl: isProduction ? { rejectUnauthorized: false } : false,
             logging: false,
           };
         }
         return {
-          type: 'postgres',
-          host: cfg.get('DB_HOST', 'localhost'),
-          port: parseInt(cfg.get('DB_PORT', '5432'), 10),
-          username: cfg.get('DB_USERNAME', 'postgres'),
-          password: cfg.get('DB_PASSWORD', '1234'),
-          database: cfg.get('DB_NAME', 'fashion_shop'),
-          entities: [
-            User,
-            Product,
-            ProductVariant,
-            CartItem,
-            Order,
-            Review,
-            Category,
-            ChatSession,
-            ChatMessage,
-            StyleProfile,
-          ],
-          synchronize: true,
+          type: 'postgres' as const,
+          host: cfg.get<string>('DB_HOST', 'localhost'),
+          port: parseInt(cfg.get<string>('DB_PORT', '5432'), 10),
+          username: cfg.get<string>('DB_USERNAME', 'postgres'),
+          password: cfg.get<string>('DB_PASSWORD', '1234'),
+          database: cfg.get<string>('DB_NAME', 'fashion_shop'),
+          entities: ENTITIES,
+          synchronize,
           logging: false,
         };
       },
@@ -86,7 +94,7 @@ import { StyleProfile } from './ai-chat/entities/style-profile.entity';
     ServeStaticModule.forRoot({
       rootPath: join(__dirname, '..', 'public'),
       serveRoot: '/',
-      exclude: ['/api*', '/users*', '/auth*'],
+      exclude: ['/api*', '/users*', '/auth*', '/health*', '/ready*', '/products*', '/categories*'],
     }),
 
     UsersModule,
@@ -98,6 +106,7 @@ import { StyleProfile } from './ai-chat/entities/style-profile.entity';
     ReviewsModule,
     CategoriesModule,
     AiChatModule,
+    HealthModule,
   ],
   controllers: [AppController],
   providers: [
