@@ -18,7 +18,9 @@ describe('Orders (e2e)', () => {
     }).compile();
 
     app = moduleFixture.createNestApplication();
-    app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));
+    app.useGlobalPipes(
+      new ValidationPipe({ whitelist: true, transform: true }),
+    );
     await app.init();
 
     dataSource = moduleFixture.get(DataSource);
@@ -63,9 +65,7 @@ describe('Orders (e2e)', () => {
         .post('/orders')
         .set('Authorization', `Bearer ${adminToken}`)
         .send({
-          items: [
-            { productId, name: 'bị bỏ qua', price: 1, quantity: 2 },
-          ],
+          items: [{ productId, name: 'bị bỏ qua', price: 1, quantity: 2 }],
           total: 398000,
           shippingName: 'Nguyễn Văn A',
           shippingPhone: '0901234567',
@@ -74,7 +74,9 @@ describe('Orders (e2e)', () => {
         })
         .expect(201);
 
-      const body = res.body as { order: { id: number; paymentMethod: string; paymentStatus: string } };
+      const body = res.body as {
+        order: { id: number; paymentMethod: string; paymentStatus: string };
+      };
       expect(body.order.paymentMethod).toBe('cod');
       expect(body.order.paymentStatus).toBe('unpaid');
       orderId = body.order.id;
@@ -85,9 +87,7 @@ describe('Orders (e2e)', () => {
         .post('/orders')
         .set('Authorization', `Bearer ${adminToken}`)
         .send({
-          items: [
-            { productId, name: 'bị bỏ qua', price: 999999, quantity: 1 },
-          ],
+          items: [{ productId, name: 'bị bỏ qua', price: 999999, quantity: 1 }],
           total: 199000,
           shippingName: 'Nguyễn Văn A',
           shippingPhone: '0901234567',

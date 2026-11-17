@@ -14,9 +14,15 @@ import { UserRole } from '../users/user.entity';
 export class DashboardController {
   constructor(private readonly dashboardService: DashboardService) {}
 
-  // GET /dashboard/stats
+  // GET /dashboard/stats — Executive analytics & KPI summary
   @Get('stats')
   getStats() {
+    return this.dashboardService.getStats();
+  }
+
+  // GET /dashboard/executive — Alias for executive analytics payload
+  @Get('executive')
+  getExecutive() {
     return this.dashboardService.getStats();
   }
 

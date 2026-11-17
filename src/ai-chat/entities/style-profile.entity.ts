@@ -26,6 +26,21 @@ export class StyleProfile {
   @Column({ type: 'simple-array', nullable: true })
   keywords: string[] | null;
 
+  @Column({ type: 'varchar', length: 120, nullable: true })
+  archetype: string | null;
+
+  @Column({ type: 'varchar', length: 80, nullable: true })
+  archetypeCode: string | null;
+
+  @Column({ type: 'varchar', length: 60, nullable: true })
+  preferredFit: string | null;
+
+  @Column({ type: 'varchar', length: 100, nullable: true })
+  recommendedTier: string | null;
+
+  @Column({ type: 'json', nullable: true })
+  quizAnswers: Record<string, string> | null;
+
   @CreateDateColumn()
   createdAt: Date;
 

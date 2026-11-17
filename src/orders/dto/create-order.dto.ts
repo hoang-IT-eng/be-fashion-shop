@@ -55,4 +55,13 @@ export class CreateOrderDto {
 
   @IsEnum(PaymentMethod)
   paymentMethod: PaymentMethod;
+
+  @IsOptional()
+  @IsString()
+  voucherCode?: string;
+
+  @IsOptional()
+  @IsNumber()
+  @Type(() => Number)
+  shippingFee?: number;
 }

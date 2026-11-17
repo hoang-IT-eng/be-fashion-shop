@@ -19,7 +19,7 @@ export class Product {
   @Column({ type: 'text', nullable: true })
   description: string | null;
 
-  @Column({ type: 'decimal', precision: 10, scale: 2 })
+  @Column({ type: 'decimal', precision: 12, scale: 2 })
   price: number;
 
   @Column({ type: 'int', default: 0 })
@@ -27,6 +27,18 @@ export class Product {
 
   @Column({ type: 'varchar', length: 100, nullable: true })
   category: string | null;
+
+  @Column({ type: 'varchar', length: 120, nullable: true })
+  brand: string | null;
+
+  @Column({ type: 'varchar', length: 60, nullable: true })
+  releaseType: string | null;
+
+  @Column({ type: 'varchar', length: 80, nullable: true })
+  condition: string | null;
+
+  @Column({ type: 'varchar', length: 100, nullable: true })
+  authenticityCode: string | null;
 
   @Column({ type: 'varchar', length: 500, nullable: true })
   imageUrl: string | null;

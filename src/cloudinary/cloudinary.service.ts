@@ -21,7 +21,11 @@ export class CloudinaryService {
       const upload = cloudinary.uploader.upload_stream(
         { folder, resource_type: 'image' },
         (error, result) => {
-          if (error) return reject(error);
+          if (error) {
+            return reject(
+              new Error(error.message || 'Cloudinary upload failed'),
+            );
+          }
           resolve(result as UploadApiResponse);
         },
       );

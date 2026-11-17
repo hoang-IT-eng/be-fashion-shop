@@ -28,6 +28,15 @@ import { ChatMessage } from './ai-chat/entities/chat-message.entity';
 import { StyleProfile } from './ai-chat/entities/style-profile.entity';
 import { CacheModule } from './cache/cache.module';
 import { HealthModule } from './health/health.module';
+import { AuctionsModule } from './auctions/auctions.module';
+import { AuctionLot } from './auctions/auction-lot.entity';
+import { AuctionBid } from './auctions/auction-bid.entity';
+import { MysteryBoxesModule } from './mystery-boxes/mystery-boxes.module';
+import { MysteryBox } from './mystery-boxes/mystery-box.entity';
+import { ConciergeModule } from './concierge/concierge.module';
+import { ConciergeRequest } from './concierge/concierge-request.entity';
+import { VouchersModule } from './vouchers/vouchers.module';
+import { Voucher } from './vouchers/voucher.entity';
 
 const ENTITIES = [
   User,
@@ -40,15 +49,13 @@ const ENTITIES = [
   ChatSession,
   ChatMessage,
   StyleProfile,
+  AuctionLot,
+  AuctionBid,
+  MysteryBox,
+  ConciergeRequest,
+  Voucher,
 ];
 
-/**
- * Schema sync flag.
- * Default true for free-tier / local DX (no migration runner required yet).
- * Set TYPEORM_SYNCHRONIZE=false once you adopt migrations (see src/migrations/README.md).
- * synchronize never drops columns/tables unexpectedly for additive changes, but
- * still avoid relying on it for production schema ownership long-term.
- */
 function resolveSynchronize(cfg: ConfigService): boolean {
   const raw = cfg.get<string>('TYPEORM_SYNCHRONIZE');
   if (raw === undefined || raw === null || raw === '') return true;
@@ -94,7 +101,23 @@ function resolveSynchronize(cfg: ConfigService): boolean {
     ServeStaticModule.forRoot({
       rootPath: join(__dirname, '..', 'public'),
       serveRoot: '/',
-      exclude: ['/api*', '/users*', '/auth*', '/health*', '/ready*', '/products*', '/categories*'],
+      exclude: [
+        '/api*',
+        '/users*',
+        '/auth*',
+        '/health*',
+        '/ready*',
+        '/products*',
+        '/categories*',
+        '/cart*',
+        '/orders*',
+        '/dashboard*',
+        '/auctions*',
+        '/mystery-boxes*',
+        '/concierge*',
+        '/vouchers*',
+        '/ai-chat*',
+      ],
     }),
 
     UsersModule,
@@ -105,6 +128,10 @@ function resolveSynchronize(cfg: ConfigService): boolean {
     DashboardModule,
     ReviewsModule,
     CategoriesModule,
+    AuctionsModule,
+    MysteryBoxesModule,
+    ConciergeModule,
+    VouchersModule,
     AiChatModule,
     HealthModule,
   ],
