@@ -25,6 +25,10 @@ export class ProductsService {
     const {
       search,
       category,
+      brand,
+      releaseType,
+      size,
+      sort,
       minPrice,
       maxPrice,
       page = 1,
@@ -42,6 +46,10 @@ export class ProductsService {
     const cacheKey = `${PRODUCTS_LIST_PREFIX}${JSON.stringify({
       search: search ?? null,
       category: category ?? null,
+      brand: brand ?? null,
+      releaseType: releaseType ?? null,
+      size: size ?? null,
+      sort: sort ?? null,
       minPrice: minPrice ?? null,
       maxPrice: maxPrice ?? null,
       page,
@@ -57,13 +65,27 @@ export class ProductsService {
     }>(cacheKey);
     if (cached) return cached;
 
-    const qb = this.productRepo.createQueryBuilder('product');
+    const qb = this.productRepo
+      .createQueryBuilder('product')
+      .leftJoinAndSelect('product.variants', 'variants');
 
     if (category) {
       qb.andWhere('product.category = :category', { category });
     }
+    if (brand) {
+      qb.andWhere('product.brand ILIKE :brand', { brand: `%${brand}%` });
+    }
+    if (releaseType) {
+      qb.andWhere('product.releaseType = :releaseType', { releaseType });
+    }
+    if (size) {
+      qb.andWhere('product.sizes ILIKE :size', { size: `%${size}%` });
+    }
     if (search) {
-      qb.andWhere('product.name ILIKE :search', { search: `%${search}%` });
+      qb.andWhere(
+        '(product.name ILIKE :search OR product.description ILIKE :search OR product.brand ILIKE :search)',
+        { search: `%${search}%` },
+      );
     }
     if (minPrice !== undefined) {
       qb.andWhere('product.price >= :minPrice', { minPrice });
@@ -72,9 +94,15 @@ export class ProductsService {
       qb.andWhere('product.price <= :maxPrice', { maxPrice });
     }
 
-    qb.orderBy('product.createdAt', 'DESC')
-      .skip((page - 1) * limit)
-      .take(limit);
+    if (sort === 'price_asc') {
+      qb.orderBy('product.price', 'ASC');
+    } else if (sort === 'price_desc') {
+      qb.orderBy('product.price', 'DESC');
+    } else {
+      qb.orderBy('product.createdAt', 'DESC');
+    }
+
+    qb.skip((page - 1) * limit).take(limit);
 
     const [data, total] = await qb.getManyAndCount();
 
@@ -90,10 +118,21 @@ export class ProductsService {
   }
 
   async findOne(id: number): Promise<Product> {
-    const product = await this.productRepo.findOneBy({ id });
+    const product = await this.productRepo.findOne({
+      where: { id },
+      relations: ['variants'],
+    });
     if (!product)
       throw new NotFoundException(`Không tìm thấy sản phẩm id=${id}`);
     return product;
+  }
+
+  async findAllActiveWithVariants(): Promise<Product[]> {
+    return this.productRepo.find({
+      where: { isActive: true },
+      relations: ['variants'],
+      order: { createdAt: 'DESC' },
+    });
   }
 
   async create(dto: CreateProductDto): Promise<Product> {
@@ -166,10 +205,9 @@ export class ProductsService {
       qb.andWhere('product.price <= :maxPrice', { maxPrice: filters.maxPrice });
     }
 
-    const searchableTerms = [
-      filters.style,
-      ...(filters.keywords ?? []),
-    ].filter(Boolean) as string[];
+    const searchableTerms = [filters.style, ...(filters.keywords ?? [])].filter(
+      Boolean,
+    ) as string[];
 
     if (searchableTerms.length > 0) {
       qb.andWhere(

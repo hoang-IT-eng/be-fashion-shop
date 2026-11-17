@@ -1,13 +1,18 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { ProductsService } from '../products/products.service';
 import { ChatInputDto } from './dto/chat-input.dto';
 import { ChatMessage } from './entities/chat-message.entity';
 import { ChatSession } from './entities/chat-session.entity';
 import { StyleProfile } from './entities/style-profile.entity';
 import { GeminiClientService } from './gemini-client.service';
-import { AiChatResponse, ProductSearchFilters } from './interfaces/ai-chat.interface';
+import { HybridRagRouterService } from './hybrid-rag-router.service';
+import {
+  AiChatResponse,
+  GenerativeUiBlock,
+  ProductSearchFilters,
+} from './interfaces/ai-chat.interface';
+import { Product } from '../products/product.entity';
 
 @Injectable()
 export class AiChatService {
@@ -18,8 +23,8 @@ export class AiChatService {
     private readonly messageRepo: Repository<ChatMessage>,
     @InjectRepository(StyleProfile)
     private readonly styleProfileRepo: Repository<StyleProfile>,
-    private readonly productsService: ProductsService,
     private readonly geminiClientService: GeminiClientService,
+    private readonly hybridRagRouter: HybridRagRouterService,
   ) {}
 
   async processMessage(params: {
@@ -33,79 +38,192 @@ export class AiChatService {
       guestId: params.guestId,
     });
 
+    const trimmedMessage = params.input.message.trim();
+
     await this.messageRepo.save(
       this.messageRepo.create({
         sessionId: session.id,
         role: 'user',
-        content: params.input.message,
+        content: trimmedMessage,
         metadata: null,
       }),
     );
 
-    const isShoppingIntent =
-      await this.geminiClientService.detectShoppingIntent(params.input.message);
-    let metadata: Record<string, unknown>;
-    let response: AiChatResponse;
+    const styleProfile = params.userId
+      ? await this.styleProfileRepo.findOneBy({ userId: params.userId })
+      : null;
 
-    if (!isShoppingIntent) {
-      const message = await this.geminiClientService.generateGeneralMessage(
-        params.input.message,
-      );
-      metadata = { type: 'text' };
-      response = {
-        type: 'text',
-        sessionId: session.id,
-        message,
-      };
-    } else {
-      const styleProfile = params.userId
-        ? await this.styleProfileRepo.findOneBy({ userId: params.userId })
-        : null;
-      const extractedFilters = await this.geminiClientService.extractProductFilters(
-        params.input.message,
+    const hasGemini = this.geminiClientService.hasValidApiKey();
+    let engine: 'gemini-tools' | 'hybrid-local-rag' = 'hybrid-local-rag';
+    let toolsInvoked: string[] = [];
+    let uiBlocks: GenerativeUiBlock[] = [];
+    let products: Product[] = [];
+    let filters: ProductSearchFilters = {};
+    let replyMessage = '';
+
+    // Attempt Gemini Level-3 Function Calling when key is configured
+    if (hasGemini) {
+      const planned = await this.geminiClientService.planToolCall(
+        trimmedMessage,
         styleProfile,
       );
-      const mergedFilters = this.mergeFilters(extractedFilters, styleProfile);
+      if (planned) {
+        engine = 'gemini-tools';
+        toolsInvoked = [planned.name];
 
-      const products = await this.productsService.searchForAi({
-        category: mergedFilters.category,
-        color: mergedFilters.color,
-        style: mergedFilters.style,
-        minPrice: mergedFilters.minPrice,
-        maxPrice: mergedFilters.maxPrice,
-        keywords: mergedFilters.keywords,
-        limit: 20,
-      });
-
-      if (params.userId) {
-        await this.upsertStyleProfile(params.userId, mergedFilters);
+        if (planned.name === 'search_products_hybrid') {
+          filters = {
+            category: planned.args.category,
+            color: planned.args.color,
+            size: planned.args.size,
+            minPrice: planned.args.minPrice,
+            maxPrice: planned.args.maxPrice,
+          };
+          const res = await this.hybridRagRouter.searchProductsHybrid(
+            planned.args.query || trimmedMessage,
+            filters,
+            4,
+          );
+          products = res.products;
+          if (products.length > 0) {
+            uiBlocks.push(
+              this.hybridRagRouter.buildProductCardsBlock(
+                'ARCHIVAL SELECTION',
+                products,
+                res.scores,
+              ),
+            );
+          }
+          replyMessage = await this.geminiClientService.synthesizeStylistReply(
+            trimmedMessage,
+            JSON.stringify(
+              products.map((p) => ({ name: p.name, price: Number(p.price) })),
+            ),
+            `Curated ${products.length} pieces matching your brief.`,
+          );
+        } else if (planned.name === 'check_variant_stock') {
+          const stockInfo = await this.hybridRagRouter.checkVariantStock(
+            planned.args.productQuery,
+            planned.args.size,
+          );
+          const res = await this.hybridRagRouter.searchProductsHybrid(
+            planned.args.productQuery,
+            { size: planned.args.size },
+            3,
+          );
+          products = res.products;
+          if (products.length > 0) {
+            uiBlocks.push(
+              this.hybridRagRouter.buildProductCardsBlock(
+                'LIVE SKU STOCK VERIFICATION',
+                products,
+                res.scores,
+              ),
+            );
+          }
+          replyMessage = await this.geminiClientService.synthesizeStylistReply(
+            trimmedMessage,
+            JSON.stringify(stockInfo),
+            `Verified live variant stock across ${products.length} archive items.`,
+          );
+        } else if (planned.name === 'get_live_auctions') {
+          const lots = await this.hybridRagRouter.getLiveAuctions();
+          if (lots.length > 0) {
+            uiBlocks.push({
+              kind: 'auction_card',
+              title: 'LIVE GRAIL AUCTIONS',
+              lots,
+            });
+          }
+          replyMessage = await this.geminiClientService.synthesizeStylistReply(
+            trimmedMessage,
+            JSON.stringify(lots),
+            `${lots.length} Grail auction lots are currently live.`,
+          );
+        } else if (planned.name === 'get_order_status') {
+          const order = await this.hybridRagRouter.getOrderStatus({
+            orderId: planned.args.orderId,
+            userId: params.userId,
+          });
+          if (order) {
+            uiBlocks.push({
+              kind: 'order_stepper',
+              title: `ORDER #${order.id} TELEMETRY`,
+              order,
+            });
+          }
+          replyMessage = await this.geminiClientService.synthesizeStylistReply(
+            trimmedMessage,
+            JSON.stringify(order),
+            order
+              ? `Order #${order.id} is currently ${order.status.toUpperCase()}.`
+              : 'Specify your order number or sign in to view live order telemetry.',
+          );
+        } else if (planned.name === 'validate_coupon') {
+          const coupon = await this.hybridRagRouter.validateCoupon(
+            planned.args.code,
+            planned.args.subtotal,
+          );
+          replyMessage = await this.geminiClientService.synthesizeStylistReply(
+            trimmedMessage,
+            JSON.stringify(coupon),
+            coupon.message,
+          );
+        }
       }
-
-      const message =
-        await this.geminiClientService.generateRecommendationMessage(
-          params.input.message,
-          products,
-        );
-      metadata = {
-        type: 'product_recommendations',
-        filters: mergedFilters,
-        productIds: products.map((product) => product.id),
-      };
-      response = {
-        type: 'product_recommendations',
-        sessionId: session.id,
-        message,
-        products,
-        filters: mergedFilters,
-      };
     }
+
+    // Zero-Key Smart Local Hybrid BM25 + Intent Router (or fallback if Gemini didn't pick a tool)
+    if (!replyMessage) {
+      const localResult = await this.hybridRagRouter.routeAndExecute({
+        message: trimmedMessage,
+        userId: params.userId,
+        styleProfile,
+      });
+      replyMessage = localResult.message;
+      toolsInvoked = localResult.toolsInvoked;
+      uiBlocks = localResult.uiBlocks;
+      products = localResult.products;
+      filters = localResult.filters;
+    }
+
+    if (
+      params.userId &&
+      (filters.color || filters.category || filters.keywords?.length)
+    ) {
+      await this.upsertStyleProfile(params.userId, filters);
+    }
+
+    const responseType =
+      products.length > 0
+        ? 'product_recommendations'
+        : uiBlocks.length > 0
+          ? 'generative_ui'
+          : 'text';
+
+    const response: AiChatResponse = {
+      type: responseType,
+      sessionId: session.id,
+      message: replyMessage,
+      engine,
+      toolsInvoked,
+      uiBlocks,
+      products: products.length > 0 ? products : undefined,
+      filters,
+    };
 
     await this.messageRepo.save(
       this.messageRepo.create({
         sessionId: session.id,
         role: 'assistant',
         content: response.message,
-        metadata,
+        metadata: {
+          type: response.type,
+          engine,
+          toolsInvoked,
+          uiBlocksCount: uiBlocks.length,
+          productIds: products.map((p) => p.id),
+        },
       }),
     );
 
@@ -118,8 +236,14 @@ export class AiChatService {
     guestId?: string;
   }): Promise<ChatSession> {
     if (params.sessionId) {
-      const existing = await this.sessionRepo.findOneBy({ id: params.sessionId });
-      if (existing) return existing;
+      try {
+        const existing = await this.sessionRepo.findOneBy({
+          id: params.sessionId,
+        });
+        if (existing) return existing;
+      } catch {
+        // Ignore non-UUID client session IDs and issue a clean DB session
+      }
     }
 
     const created = this.sessionRepo.create({
@@ -131,25 +255,6 @@ export class AiChatService {
     return this.sessionRepo.save(created);
   }
 
-  private mergeFilters(
-    extracted: ProductSearchFilters,
-    styleProfile?: StyleProfile | null,
-  ): ProductSearchFilters {
-    const categories = extracted.categories ?? styleProfile?.categories ?? [];
-    const colors = extracted.colors ?? styleProfile?.colors ?? [];
-    const keywords = extracted.keywords ?? styleProfile?.keywords ?? [];
-
-    return {
-      ...extracted,
-      category: extracted.category ?? categories[0],
-      color: extracted.color ?? colors[0],
-      style: extracted.style ?? styleProfile?.style ?? undefined,
-      categories,
-      colors,
-      keywords,
-    };
-  }
-
   private async upsertStyleProfile(
     userId: number,
     filters: ProductSearchFilters,
@@ -158,7 +263,11 @@ export class AiChatService {
     const profile = existing ?? this.styleProfileRepo.create({ userId });
 
     profile.style = filters.style ?? profile.style ?? null;
-    profile.colors = this.mergeArray(profile.colors, filters.colors, filters.color);
+    profile.colors = this.mergeArray(
+      profile.colors,
+      filters.colors,
+      filters.color,
+    );
     profile.categories = this.mergeArray(
       profile.categories,
       filters.categories,

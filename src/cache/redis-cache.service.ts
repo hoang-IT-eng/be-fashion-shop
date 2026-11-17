@@ -20,10 +20,7 @@ export class RedisCacheService implements OnModuleInit, OnModuleDestroy {
   private readonly ttlSeconds: number;
 
   constructor(private readonly cfg: ConfigService) {
-    this.ttlSeconds = parseInt(
-      cfg.get<string>('CACHE_TTL_SECONDS', '60'),
-      10,
-    );
+    this.ttlSeconds = parseInt(cfg.get<string>('CACHE_TTL_SECONDS', '60'), 10);
   }
 
   async onModuleInit(): Promise<void> {
@@ -49,7 +46,7 @@ export class RedisCacheService implements OnModuleInit, OnModuleDestroy {
       await client.connect();
       const pong = await client.ping();
       if (pong !== 'PONG') {
-        throw new Error(`Unexpected PING response: ${pong}`);
+        throw new Error(`Unexpected PING response: ${String(pong)}`);
       }
 
       this.client = client;
@@ -57,7 +54,9 @@ export class RedisCacheService implements OnModuleInit, OnModuleDestroy {
       this.logger.log('Redis cache connected');
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
-      this.logDegrade(`Redis unreachable (${message}) — continuing without cache`);
+      this.logDegrade(
+        `Redis unreachable (${message}) — continuing without cache`,
+      );
       await this.safeQuit();
       this.client = null;
       this.enabled = false;
@@ -135,7 +134,9 @@ export class RedisCacheService implements OnModuleInit, OnModuleDestroy {
   private disableOnError(): void {
     if (!this.enabled) return;
     this.enabled = false;
-    this.logDegrade('Redis error during cache op — disabling cache for this process');
+    this.logDegrade(
+      'Redis error during cache op — disabling cache for this process',
+    );
   }
 
   private async safeQuit(): Promise<void> {

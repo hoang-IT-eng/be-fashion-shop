@@ -74,7 +74,9 @@ describe('Categories (e2e)', () => {
 
   describe('GET /categories (public)', () => {
     it('should return active categories', async () => {
-      const res = await request(app.getHttpServer()).get('/categories').expect(200);
+      const res = await request(app.getHttpServer())
+        .get('/categories')
+        .expect(200);
       const body = res.body as { name: string }[];
       expect(Array.isArray(body)).toBe(true);
       expect(body.length).toBeGreaterThan(0);

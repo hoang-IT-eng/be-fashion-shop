@@ -1,11 +1,6 @@
 /**
- * TypeORM DataSource for CLI migrations (scaffold).
+ * TypeORM DataSource for CLI migrations.
  * Schema sync remains the default via TYPEORM_SYNCHRONIZE (see DEPLOY.md).
- *
- * Generate a migration after entity changes (when you turn sync off):
- *   npx typeorm-ts-node-commonjs migration:generate -d src/data-source.ts src/migrations/Name
- * Run:
- *   npx typeorm-ts-node-commonjs migration:run -d src/data-source.ts
  */
 import 'reflect-metadata';
 import { config as loadEnv } from 'dotenv';
@@ -20,6 +15,11 @@ import { Order } from './orders/order.entity';
 import { ChatSession } from './ai-chat/entities/chat-session.entity';
 import { ChatMessage } from './ai-chat/entities/chat-message.entity';
 import { StyleProfile } from './ai-chat/entities/style-profile.entity';
+import { AuctionLot } from './auctions/auction-lot.entity';
+import { AuctionBid } from './auctions/auction-bid.entity';
+import { MysteryBox } from './mystery-boxes/mystery-box.entity';
+import { ConciergeRequest } from './concierge/concierge-request.entity';
+import { Voucher } from './vouchers/voucher.entity';
 
 loadEnv();
 
@@ -37,6 +37,11 @@ const entities = [
   ChatSession,
   ChatMessage,
   StyleProfile,
+  AuctionLot,
+  AuctionBid,
+  MysteryBox,
+  ConciergeRequest,
+  Voucher,
 ];
 
 export default databaseUrl

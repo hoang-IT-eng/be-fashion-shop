@@ -19,12 +19,17 @@ type JwtPayload = {
   email: string;
 };
 
-type AuthenticatedSocket = Socket & {
-  data: {
-    userId?: number;
-    guestId?: string;
-  };
+type SocketData = {
+  userId?: number;
+  guestId?: string;
 };
+
+type AuthenticatedSocket = Socket<
+  Record<string, never>,
+  Record<string, (...args: unknown[]) => void>,
+  Record<string, never>,
+  SocketData
+>;
 
 @Public()
 @WebSocketGateway({
@@ -94,8 +99,7 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
         typeof client.handshake.auth?.token === 'string'
           ? client.handshake.auth.token
           : undefined,
-      ) ??
-      this.getBearerToken(client.handshake.headers.authorization);
+      ) ?? this.getBearerToken(client.handshake.headers.authorization);
 
     if (!authToken) return undefined;
 

@@ -11,6 +11,22 @@ export class QueryProductDto {
   category?: string;
 
   @IsOptional()
+  @IsString()
+  brand?: string;
+
+  @IsOptional()
+  @IsString()
+  releaseType?: string;
+
+  @IsOptional()
+  @IsString()
+  size?: string;
+
+  @IsOptional()
+  @IsString()
+  sort?: string;
+
+  @IsOptional()
   @IsNumber()
   @Min(0, { message: 'minPrice phải >= 0' })
   @Type(() => Number)

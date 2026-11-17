@@ -1,9 +1,36 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { GoogleGenerativeAI, SchemaType } from '@google/generative-ai';
-import { Product } from '../products/product.entity';
-import { ProductSearchFilters } from './interfaces/ai-chat.interface';
 import { StyleProfile } from './entities/style-profile.entity';
+
+export type GeminiPlannedToolCall =
+  | {
+      name: 'search_products_hybrid';
+      args: {
+        query?: string;
+        category?: string;
+        color?: string;
+        size?: string;
+        minPrice?: number;
+        maxPrice?: number;
+      };
+    }
+  | {
+      name: 'check_variant_stock';
+      args: { productQuery: string; size?: string };
+    }
+  | {
+      name: 'get_live_auctions';
+      args: Record<string, unknown>;
+    }
+  | {
+      name: 'get_order_status';
+      args: { orderId?: number };
+    }
+  | {
+      name: 'validate_coupon';
+      args: { code: string; subtotal?: number };
+    };
 
 @Injectable()
 export class GeminiClientService {
@@ -18,56 +45,111 @@ export class GeminiClientService {
   }
 
   /**
-   * Returns a GoogleGenerativeAI instance with a valid API key.
-   * Throws only when actually called (lazy validation), so the service
-   * can be instantiated in tests without a real key.
+   * Safe check — NEVER throws when GEMINI_API_KEY is missing, empty, or placeholder.
    */
-  private getClient(): GoogleGenerativeAI {
-    const apiKey =
+  hasValidApiKey(): boolean {
+    const raw = (
       this.configService.get<string>('GEMINI_API_KEY') ??
-      this.configService.get<string>('gemini_api');
-    if (!apiKey) {
-      throw new Error(
-        'Missing GEMINI_API_KEY. Please set this variable in your environment.',
-      );
+      this.configService.get<string>('gemini_api') ??
+      ''
+    ).trim();
+    if (!raw) return false;
+    if (
+      raw === 'your_gemini_api_key' ||
+      raw.startsWith('your_') ||
+      raw === 'changeme'
+    ) {
+      return false;
     }
+    return true;
+  }
+
+  private getClientOrNull(): GoogleGenerativeAI | null {
+    if (!this.hasValidApiKey()) return null;
+    const apiKey = (
+      this.configService.get<string>('GEMINI_API_KEY') ??
+      this.configService.get<string>('gemini_api') ??
+      ''
+    ).trim();
     return new GoogleGenerativeAI(apiKey);
   }
 
-  async extractProductFilters(
+  /**
+   * Uses Gemini Function Calling when GEMINI_API_KEY is configured.
+   * Returns null if key is missing or Gemini request fails so caller seamlessly uses HybridRagRouterService.
+   */
+  async planToolCall(
     userMessage: string,
     styleProfile?: StyleProfile | null,
-  ): Promise<ProductSearchFilters> {
-    const model = this.getClient().getGenerativeModel({
+  ): Promise<GeminiPlannedToolCall | null> {
+    const client = this.getClientOrNull();
+    if (!client) return null;
+
+    const model = client.getGenerativeModel({
       model: this.modelName,
       tools: [
         {
           functionDeclarations: [
             {
-              name: 'searchProducts',
+              name: 'search_products_hybrid',
               description:
-                'Extract shopping filters from natural language request',
+                'Search authenticated luxury streetwear, sneakers, outerwear, and grails using hybrid BM25 + filters',
               parameters: {
                 type: SchemaType.OBJECT,
                 properties: {
+                  query: { type: SchemaType.STRING },
                   category: { type: SchemaType.STRING },
                   color: { type: SchemaType.STRING },
-                  style: { type: SchemaType.STRING },
+                  size: { type: SchemaType.STRING },
                   minPrice: { type: SchemaType.NUMBER },
                   maxPrice: { type: SchemaType.NUMBER },
-                  keywords: {
-                    type: SchemaType.ARRAY,
-                    items: { type: SchemaType.STRING },
-                  },
-                  categories: {
-                    type: SchemaType.ARRAY,
-                    items: { type: SchemaType.STRING },
-                  },
-                  colors: {
-                    type: SchemaType.ARRAY,
-                    items: { type: SchemaType.STRING },
-                  },
                 },
+              },
+            },
+            {
+              name: 'check_variant_stock',
+              description:
+                'Check live SKU size and colorway stock for a specific product',
+              parameters: {
+                type: SchemaType.OBJECT,
+                properties: {
+                  productQuery: { type: SchemaType.STRING },
+                  size: { type: SchemaType.STRING },
+                },
+                required: ['productQuery'],
+              },
+            },
+            {
+              name: 'get_live_auctions',
+              description:
+                'Fetch currently live Grail auction lots, current bids, and countdowns',
+              parameters: {
+                type: SchemaType.OBJECT,
+                properties: {},
+              },
+            },
+            {
+              name: 'get_order_status',
+              description:
+                'Track customer order status by order ID or latest order',
+              parameters: {
+                type: SchemaType.OBJECT,
+                properties: {
+                  orderId: { type: SchemaType.NUMBER },
+                },
+              },
+            },
+            {
+              name: 'validate_coupon',
+              description:
+                'Validate a promotional or secret initiation coupon code like ENIGMA15',
+              parameters: {
+                type: SchemaType.OBJECT,
+                properties: {
+                  code: { type: SchemaType.STRING },
+                  subtotal: { type: SchemaType.NUMBER },
+                },
+                required: ['code'],
               },
             },
           ],
@@ -75,185 +157,78 @@ export class GeminiClientService {
       ],
     });
 
-    const profileContext = styleProfile
-      ? `Saved style profile: ${JSON.stringify({
-          style: styleProfile.style,
-          colors: styleProfile.colors ?? [],
-          categories: styleProfile.categories ?? [],
-          keywords: styleProfile.keywords ?? [],
-        })}`
-      : 'No saved style profile';
-
-    const prompt = [
-      'You are a shopping intent parser for a fashion e-commerce chat.',
-      'Call the function searchProducts only when the user is asking to find, suggest, compare, or buy products.',
-      'Only include filters that can be inferred confidently from user input.',
-      profileContext,
-      `User message: ${userMessage}`,
-    ].join('\n');
+    const codexContext = styleProfile?.archetype
+      ? `Customer Taste Codex Archetype: ${styleProfile.archetype} (${(styleProfile.keywords ?? []).join(', ')})`
+      : 'No saved Taste Codex yet.';
 
     try {
       const result = await model.generateContent({
-        contents: [{ role: 'user', parts: [{ text: prompt }] }],
+        contents: [
+          {
+            role: 'user',
+            parts: [
+              {
+                text: [
+                  'You are the ENIGMA Archive Stylist & Grail Concierge.',
+                  'Select the single most relevant tool call if the user asks about products, stock, auctions, orders, or coupon codes.',
+                  codexContext,
+                  `User message: ${userMessage}`,
+                ].join('\n'),
+              },
+            ],
+          },
+        ],
       });
+
       const parts = result.response.candidates?.[0]?.content?.parts ?? [];
-      const functionCallPart = parts.find((part) =>
+      const fnPart = parts.find((part) =>
         Boolean((part as { functionCall?: unknown }).functionCall),
-      ) as { functionCall?: { args?: Record<string, unknown> } } | undefined;
+      ) as
+        | {
+            functionCall?: {
+              name: GeminiPlannedToolCall['name'];
+              args?: Record<string, unknown>;
+            };
+          }
+        | undefined;
 
-      const args = functionCallPart?.functionCall?.args ?? {};
-      return this.normalizeFilters(args);
+      if (!fnPart?.functionCall?.name) return null;
+      return {
+        name: fnPart.functionCall.name,
+        args: (fnPart.functionCall.args ?? {}) as never,
+      };
     } catch (error) {
-      this.logger.error('Failed to parse filters with Gemini', error);
-      return {};
-    }
-  }
-
-  async generateRecommendationMessage(
-    userMessage: string,
-    products: Product[],
-  ): Promise<string> {
-    if (products.length === 0) {
-      return 'Mình chưa tìm thấy sản phẩm phù hợp. Bạn thử nới màu, kiểu hoặc khoảng giá nhé!';
-    }
-
-    const productSummary = products.slice(0, 5).map((product) => ({
-      name: product.name,
-      category: product.category,
-      price: Number(product.price),
-      colors: product.colors ?? [],
-    }));
-
-    const prompt = [
-      'You are a fashion assistant.',
-      'Reply in the same language as the user.',
-      'Write 1-2 concise sentences and mention that product cards are shown.',
-      `User message: ${userMessage}`,
-      `Matched products: ${JSON.stringify(productSummary)}`,
-    ].join('\n');
-
-    try {
-      const model = this.getClient().getGenerativeModel({
-        model: this.modelName,
-      });
-      const result = await model.generateContent(prompt);
-      const text = result.response.text().trim();
-      return text || 'Đây là các sản phẩm phù hợp gu của bạn!';
-    } catch (error) {
-      this.logger.error('Failed to generate recommendation message', error);
-      return 'Đây là những sản phẩm phù hợp gu của bạn!';
-    }
-  }
-
-  async detectShoppingIntent(userMessage: string): Promise<boolean> {
-    const normalizedMessage = userMessage.trim().toLowerCase();
-    const shoppingKeywords = [
-      'mua',
-      'tìm',
-      'gợi ý',
-      'sản phẩm',
-      'áo',
-      'quần',
-      'giày',
-      'phụ kiện',
-      'size',
-      'màu',
-      'giá',
-      'shop',
-      'product',
-      'buy',
-      'recommend',
-      'suggest',
-      'price',
-      'color',
-    ];
-
-    if (
-      shoppingKeywords.some((keyword) => normalizedMessage.includes(keyword))
-    ) {
-      return true;
-    }
-
-    try {
-      const model = this.getClient().getGenerativeModel({
-        model: this.modelName,
-      });
-      const prompt = [
-        'Classify the user message intent.',
-        'Return exactly one word: SHOPPING or GENERAL.',
-        'SHOPPING means searching/recommending/comparing products or asking about price, size, color, stock.',
-        'GENERAL means greeting, small talk, or non-shopping questions.',
-        `User message: ${userMessage}`,
-      ].join('\n');
-      const result = await model.generateContent(prompt);
-      const label = result.response.text().trim().toUpperCase();
-      return label.includes('SHOPPING');
-    } catch (error) {
-      this.logger.error('Failed to detect shopping intent', error);
-      return false;
-    }
-  }
-
-  async generateGeneralMessage(userMessage: string): Promise<string> {
-    try {
-      const model = this.getClient().getGenerativeModel({
-        model: this.modelName,
-      });
-      const prompt = [
-        'You are a friendly shopping assistant.',
-        'Reply in the same language as the user.',
-        'For non-shopping messages, answer naturally in 1-2 short sentences.',
-        'If appropriate, invite user to describe desired outfit to get recommendations.',
-        `User message: ${userMessage}`,
-      ].join('\n');
-      const result = await model.generateContent(prompt);
-      const text = result.response.text().trim();
-      return (
-        text ||
-        'Xin chào! Mình có thể giúp bạn tìm đồ theo style, màu hoặc mức giá bạn muốn.'
+      this.logger.warn(
+        `Gemini function-calling unavailable, falling back to local Hybrid RAG router: ${
+          error instanceof Error ? error.message : 'unknown'
+        }`,
       );
-    } catch (error) {
-      this.logger.error('Failed to generate general message', error);
-      return 'Xin chào! Mình có thể giúp bạn tìm đồ theo style, màu hoặc mức giá bạn muốn.';
+      return null;
     }
   }
 
-  private normalizeFilters(
-    rawArgs: Record<string, unknown>,
-  ): ProductSearchFilters {
-    const takeString = (value: unknown): string | undefined =>
-      typeof value === 'string' && value.trim().length > 0
-        ? value.trim()
-        : undefined;
+  async synthesizeStylistReply(
+    userMessage: string,
+    contextSummary: string,
+    fallbackReply: string,
+  ): Promise<string> {
+    const client = this.getClientOrNull();
+    if (!client) return fallbackReply;
 
-    const takeNumber = (value: unknown): number | undefined => {
-      if (typeof value === 'number' && Number.isFinite(value)) {
-        return value;
-      }
-      if (typeof value === 'string') {
-        const parsed = Number(value);
-        if (Number.isFinite(parsed)) return parsed;
-      }
-      return undefined;
-    };
-
-    const takeStringArray = (value: unknown): string[] | undefined =>
-      Array.isArray(value)
-        ? value
-            .filter((item): item is string => typeof item === 'string')
-            .map((item) => item.trim())
-            .filter((item) => item.length > 0)
-        : undefined;
-
-    return {
-      category: takeString(rawArgs.category),
-      color: takeString(rawArgs.color),
-      style: takeString(rawArgs.style),
-      minPrice: takeNumber(rawArgs.minPrice),
-      maxPrice: takeNumber(rawArgs.maxPrice),
-      keywords: takeStringArray(rawArgs.keywords),
-      categories: takeStringArray(rawArgs.categories),
-      colors: takeStringArray(rawArgs.colors),
-    };
+    try {
+      const model = client.getGenerativeModel({ model: this.modelName });
+      const result = await model.generateContent(
+        [
+          'You are ENIGMA — an avant-garde luxury streetwear & grail auction stylist.',
+          'Reply in the same language as the user (Vietnamese or English) in 1-2 crisp, refined editorial sentences.',
+          `User message: ${userMessage}`,
+          `Live Vault Context: ${contextSummary}`,
+        ].join('\n'),
+      );
+      const text = result.response.text().trim();
+      return text || fallbackReply;
+    } catch {
+      return fallbackReply;
+    }
   }
 }

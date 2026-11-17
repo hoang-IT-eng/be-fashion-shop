@@ -16,6 +16,7 @@ import { CreateOrderDto } from './dto/create-order.dto';
 import { VnpayService } from '../vnpay/vnpay.service';
 import { Product } from '../products/product.entity';
 import { ProductVariant } from '../products/product-variant.entity';
+import { VouchersService } from '../vouchers/vouchers.service';
 
 // Workflow hợp lệ: từ trạng thái hiện tại có thể chuyển sang trạng thái nào
 const VALID_TRANSITIONS: Record<OrderStatus, OrderStatus[]> = {
@@ -37,6 +38,7 @@ export class OrdersService {
     @InjectRepository(ProductVariant)
     private readonly variantRepo: Repository<ProductVariant>,
     private readonly vnpayService: VnpayService,
+    private readonly vouchersService: VouchersService,
   ) {}
 
   async createOrder(
@@ -120,9 +122,30 @@ export class OrdersService {
         };
       });
 
-      const calculatedTotal = normalizedItems.reduce(
+      const subtotal = normalizedItems.reduce(
         (sum, item) => sum + item.price * item.quantity,
         0,
+      );
+
+      let discountAmount = 0;
+      let appliedCode: string | null = null;
+      if (dto.voucherCode?.trim()) {
+        const voucherResult = await this.vouchersService.validate(
+          dto.voucherCode,
+          subtotal,
+        );
+        discountAmount = voucherResult.discountAmount;
+        appliedCode = voucherResult.code;
+      }
+
+      const shippingFee =
+        dto.shippingFee !== undefined && dto.shippingFee > 0
+          ? Number(dto.shippingFee)
+          : 0;
+
+      const calculatedTotal = Math.max(
+        0,
+        subtotal - discountAmount + shippingFee,
       );
       const roundedTotal = Number(calculatedTotal.toFixed(2));
       const roundedClientTotal = Number(dto.total.toFixed(2));
@@ -134,10 +157,15 @@ export class OrdersService {
       }
 
       const order = orderRepo.create({
-        ...dto,
         userId,
         items: normalizedItems,
         total: roundedTotal,
+        voucherCode: appliedCode,
+        discountAmount,
+        shippingName: dto.shippingName,
+        shippingPhone: dto.shippingPhone,
+        shippingAddress: dto.shippingAddress,
+        paymentMethod: dto.paymentMethod,
       });
       const orderSaved = await orderRepo.save(order);
 
@@ -147,6 +175,10 @@ export class OrdersService {
       }
       for (const [pid, qty] of qtyByProduct) {
         await productRepo.decrement({ id: pid }, 'stock', qty);
+      }
+
+      if (appliedCode) {
+        await this.vouchersService.incrementUsageIfExists(appliedCode);
       }
 
       return orderSaved;
@@ -293,8 +325,9 @@ export class OrdersService {
     query: Record<string, string>,
   ): Promise<{ success: boolean; orderId: number }> {
     try {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const result = this.vnpayService.verifyReturn(query as any);
+      const result = this.vnpayService.verifyReturn(
+        query as unknown as Parameters<VnpayService['verifyReturn']>[0],
+      );
       const orderId = Number(query['vnp_TxnRef']);
       const order = await this.orderRepo.findOneBy({ id: orderId });
 

@@ -39,6 +39,26 @@ export class CreateProductDto {
 
   @IsOptional()
   @IsString()
+  @MaxLength(120)
+  brand?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(60)
+  releaseType?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(80)
+  condition?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(100)
+  authenticityCode?: string;
+
+  @IsOptional()
+  @IsString()
   @MaxLength(500)
   imageUrl?: string;
 

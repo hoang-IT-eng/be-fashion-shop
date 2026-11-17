@@ -1,47 +1,49 @@
+import { DiscountType } from '../vouchers/voucher.entity';
+import {
+  OrderStatus,
+  PaymentMethod,
+  PaymentStatus,
+} from '../orders/order.entity';
+import { ConciergeStatus } from '../concierge/concierge-request.entity';
+
 /** Shared catalog used by `npm run seed` (idempotent). */
 
 export const SEED_CATEGORIES = [
   {
-    name: 'Áo thun',
-    imageUrl:
-      'https://images.unsplash.com/photo-1521572163474-6864f9cf17ab?w=800&q=80',
+    name: 'Sneakers',
+    imageUrl: '/images/enigma/grail-sneaker-obsidian.jpg',
   },
   {
-    name: 'Áo sơ mi',
-    imageUrl:
-      'https://images.unsplash.com/photo-1596755094514-f87e34085b2c?w=800&q=80',
+    name: 'Outerwear',
+    imageUrl: '/images/enigma/grail-leather-bomber.jpg',
   },
   {
-    name: 'Quần jean',
-    imageUrl:
-      'https://images.unsplash.com/photo-1542272604-787c3835535d?w=800&q=80',
+    name: 'Hoodies',
+    imageUrl: '/images/enigma/grail-hoodie-shadow.jpg',
   },
   {
-    name: 'Váy đầm',
-    imageUrl:
-      'https://images.unsplash.com/photo-1595777457583-95e059d581b8?w=800&q=80',
+    name: 'Bottoms',
+    imageUrl: '/images/enigma/grail-cargo-vanguard.jpg',
   },
   {
-    name: 'Áo khoác',
-    imageUrl:
-      'https://images.unsplash.com/photo-1551028719-00167b16eac5?w=800&q=80',
+    name: 'Relics',
+    imageUrl: '/images/enigma/grail-chronograph-relic.jpg',
   },
   {
-    name: 'Phụ kiện',
-    imageUrl:
-      'https://images.unsplash.com/photo-1523293182086-7651a899d37f?w=800&q=80',
+    name: 'Reborn Archive',
+    imageUrl: '/images/enigma/grail-trench-monolith.jpg',
   },
 ] as const;
 
 export const SEED_USERS = [
   {
-    name: 'Admin',
+    name: 'Enigma Curator (Admin)',
     email: 'admin@fashionshop.com',
     password: 'Admin@123',
     role: 'admin' as const,
   },
   {
-    name: 'Demo User',
+    name: 'Kaelen Vinh',
     email: 'demo@fashionshop.com',
     password: 'Demo@123',
     role: 'user' as const,
@@ -54,8 +56,12 @@ export const SEED_USERS = [
   },
 ] as const;
 
-type SeedProduct = {
+export type SeedProduct = {
   name: string;
+  brand: string;
+  releaseType: 'grail' | 'reborn' | 'archive' | 'drop';
+  condition: string;
+  authenticityCode: string;
   description: string;
   price: number;
   stock: number;
@@ -66,14 +72,10 @@ type SeedProduct = {
   variants: { size: string; color: string; stock: number }[];
 };
 
-const S = ['S', 'M', 'L', 'XL'];
-const colorsA = ['Đen', 'Trắng', 'Be'];
-const colorsB = ['Xanh navy', 'Xám', 'Nâu'];
-
 function variants(
   sizes: string[],
   colors: string[],
-  stockPer = 15,
+  stockPer = 6,
 ): SeedProduct['variants'] {
   const out: SeedProduct['variants'] = [];
   for (const size of sizes) {
@@ -86,354 +88,438 @@ function variants(
 
 export const SEED_PRODUCTS: SeedProduct[] = [
   {
-    name: 'Áo thun TheBasic Essential',
-    description: 'Cotton 100%, form regular, logo thêu tối giản.',
-    price: 249000,
-    stock: 120,
-    category: 'Áo thun',
-    imageUrl:
-      'https://images.unsplash.com/photo-1521572163474-6864f9cf17ab?w=800&q=80',
-    sizes: S,
-    colors: colorsA,
-    variants: variants(S, colorsA),
+    name: 'ENIGMA 01 "Obsidian Monolith" High-Top',
+    brand: 'ENIGMA ATELIER',
+    releaseType: 'grail',
+    condition: 'Deadstock · Vault Sealed',
+    authenticityCode: 'ENG-2026-SNK-001',
+    description:
+      'Hand-lasted full-grain Italian calfskin high-top resting on an aged warm-bone Vibram cup sole. Individually numbered inner tongue.',
+    price: 8900000,
+    stock: 18,
+    category: 'Sneakers',
+    imageUrl: '/images/enigma/grail-sneaker-obsidian.jpg',
+    sizes: ['40', '41', '42', '43', '44'],
+    colors: ['Obsidian', 'Aged Bone'],
+    variants: [
+      { size: '40', color: 'Obsidian', stock: 2 },
+      { size: '41', color: 'Obsidian', stock: 4 },
+      { size: '42', color: 'Obsidian', stock: 5 },
+      { size: '43', color: 'Obsidian', stock: 4 },
+      { size: '44', color: 'Aged Bone', stock: 3 },
+    ],
   },
   {
-    name: 'Áo thun Oversized Wash',
-    description: 'Wash mềm, drop shoulder, phù hợp streetwear.',
-    price: 299000,
-    stock: 90,
-    category: 'Áo thun',
-    imageUrl:
-      'https://images.unsplash.com/photo-1583743814966-8936f5b7be1a?w=800&q=80',
-    sizes: S,
-    colors: ['Đen', 'Xám', 'Olive'],
-    variants: variants(S, ['Đen', 'Xám', 'Olive']),
+    name: 'Reborn Horsehide Flight Bomber [1-of-12]',
+    brand: 'REBORN BY ENIGMA',
+    releaseType: 'reborn',
+    condition: 'Reborn 1-of-12 Custom',
+    authenticityCode: 'ENG-2026-RBN-002',
+    description:
+      'Reconstructed from vintage heavyweight Japanese horsehide with oxidized Riri gunmetal hardware and hand-waxed storm seams.',
+    price: 14500000,
+    stock: 9,
+    category: 'Outerwear',
+    imageUrl: '/images/enigma/grail-leather-bomber.jpg',
+    sizes: ['S', 'M', 'L', 'XL'],
+    colors: ['Obsidian Patina'],
+    variants: [
+      { size: 'S', color: 'Obsidian Patina', stock: 1 },
+      { size: 'M', color: 'Obsidian Patina', stock: 3 },
+      { size: 'L', color: 'Obsidian Patina', stock: 3 },
+      { size: 'XL', color: 'Obsidian Patina', stock: 2 },
+    ],
   },
   {
-    name: 'Áo thun Polo Pique',
-    description: 'Cổ polo, vải pique thoáng khí.',
-    price: 329000,
-    stock: 80,
-    category: 'Áo thun',
-    imageUrl:
-      'https://images.unsplash.com/photo-1625910513513-918d3017c47a?w=800&q=80',
-    sizes: S,
-    colors: colorsB,
-    variants: variants(S, colorsB),
+    name: 'Shadow Archive 650gsm Sun-Faded Hoodie',
+    brand: 'ENIGMA ARCHIVE',
+    releaseType: 'drop',
+    condition: 'Deadstock',
+    authenticityCode: 'ENG-2026-HD-003',
+    description:
+      'Ultra-dense 650gsm loopwheel French terry enzyme-washed to a smoked charcoal finish with raw-edge drop shoulders and double hood.',
+    price: 3450000,
+    stock: 32,
+    category: 'Hoodies',
+    imageUrl: '/images/enigma/grail-hoodie-shadow.jpg',
+    sizes: ['S', 'M', 'L', 'XL'],
+    colors: ['Smoked Charcoal', 'Obsidian'],
+    variants: variants(
+      ['S', 'M', 'L', 'XL'],
+      ['Smoked Charcoal', 'Obsidian'],
+      4,
+    ),
   },
   {
-    name: 'Áo thun Crop Rib',
-    description: 'Form crop nữ, gân rib ôm nhẹ.',
-    price: 219000,
-    stock: 70,
-    category: 'Áo thun',
-    imageUrl:
-      'https://images.unsplash.com/photo-1562157873-818bc0726f68?w=800&q=80',
+    name: 'Concrete Vanguard Waxed Cargo Trousers',
+    brand: 'VANGUARD LAB',
+    releaseType: 'archive',
+    condition: 'Archival Mint',
+    authenticityCode: 'ENG-2026-BTM-004',
+    description:
+      '14oz waxed black Okayama selvedge denim engineered with 8 articulated bellows pockets, knee darts, and matte cobra-style clasps.',
+    price: 5200000,
+    stock: 20,
+    category: 'Bottoms',
+    imageUrl: '/images/enigma/grail-cargo-vanguard.jpg',
+    sizes: ['28', '30', '32', '34'],
+    colors: ['Waxed Obsidian'],
+    variants: variants(['28', '30', '32', '34'], ['Waxed Obsidian'], 5),
+  },
+  {
+    name: 'Nocturne Skeleton Titanium Chronograph & Signet Set',
+    brand: 'ENIGMA HOROLOGY',
+    releaseType: 'grail',
+    condition: 'Vault Numbered Edition',
+    authenticityCode: 'ENG-2026-RLC-005',
+    description:
+      'Grade-5 brushed black titanium open-worked mechanical calibre with antique gold balance wheel, paired with hammered .925 sterling signet.',
+    price: 22800000,
+    stock: 5,
+    category: 'Relics',
+    imageUrl: '/images/enigma/grail-chronograph-relic.jpg',
+    sizes: ['One Size'],
+    colors: ['Brushed Titanium / Gold'],
+    variants: [
+      { size: 'One Size', color: 'Brushed Titanium / Gold', stock: 5 },
+    ],
+  },
+  {
+    name: 'Aether Bone Suede & Carbon Runner',
+    brand: 'VANGUARD LAB',
+    releaseType: 'drop',
+    condition: 'Deadstock',
+    authenticityCode: 'ENG-2026-SNK-006',
+    description:
+      'Warm bone Italian calf suede upper over ballistic pewter mesh and a sculpted matte-carbon propulsion midsole.',
+    price: 6800000,
+    stock: 24,
+    category: 'Sneakers',
+    imageUrl: '/images/enigma/grail-runner-bone.jpg',
+    sizes: ['40', '41', '42', '43', '44'],
+    colors: ['Warm Bone / Carbon'],
+    variants: variants(['40', '41', '42', '43'], ['Warm Bone / Carbon'], 6),
+  },
+  {
+    name: 'Monolith Double-Faced Virgin Wool Overcoat',
+    brand: 'ENIGMA ATELIER',
+    releaseType: 'reborn',
+    condition: 'Atelier Tailored',
+    authenticityCode: 'ENG-2026-COT-007',
+    description:
+      'Floor-sweeping architectural overcoat cut from 780g virgin wool-cashmere with concealed horn placket and razor peak lapels.',
+    price: 16900000,
+    stock: 11,
+    category: 'Reborn Archive',
+    imageUrl: '/images/enigma/grail-trench-monolith.jpg',
     sizes: ['S', 'M', 'L'],
-    colors: ['Trắng', 'Hồng', 'Đen'],
-    variants: variants(['S', 'M', 'L'], ['Trắng', 'Hồng', 'Đen']),
+    colors: ['Deep Obsidian'],
+    variants: [
+      { size: 'S', color: 'Deep Obsidian', stock: 3 },
+      { size: 'M', color: 'Deep Obsidian', stock: 5 },
+      { size: 'L', color: 'Deep Obsidian', stock: 3 },
+    ],
   },
   {
-    name: 'Sơ mi Oxford Classic',
-    description: 'Oxford cotton, cổ button-down, dễ phối.',
-    price: 449000,
-    stock: 60,
-    category: 'Áo sơ mi',
-    imageUrl:
-      'https://images.unsplash.com/photo-1596755094514-f87e34085b2c?w=800&q=80',
-    sizes: S,
-    colors: ['Trắng', 'Xanh nhạt', 'Hồng nhạt'],
-    variants: variants(S, ['Trắng', 'Xanh nhạt', 'Hồng nhạt']),
-  },
-  {
-    name: 'Sơ mi Linen Summer',
-    description: 'Linen thoáng, form suông mùa hè.',
-    price: 499000,
-    stock: 55,
-    category: 'Áo sơ mi',
-    imageUrl:
-      'https://images.unsplash.com/photo-1602810318383-e386cc2a3ccf?w=800&q=80',
-    sizes: S,
-    colors: ['Be', 'Trắng', 'Xanh mint'],
-    variants: variants(S, ['Be', 'Trắng', 'Xanh mint']),
-  },
-  {
-    name: 'Sơ mi Slim Stretch',
-    description: 'Vải co giãn nhẹ, form slim office.',
-    price: 479000,
-    stock: 50,
-    category: 'Áo sơ mi',
-    imageUrl:
-      'https://images.unsplash.com/photo-1598033129183-c4f50c736f10?w=800&q=80',
-    sizes: S,
-    colors: colorsB,
-    variants: variants(S, colorsB),
-  },
-  {
-    name: 'Sơ mi Flannel Check',
-    description: 'Flannel kẻ caro, cảm giác ấm nhẹ.',
-    price: 429000,
-    stock: 45,
-    category: 'Áo sơ mi',
-    imageUrl:
-      'https://images.unsplash.com/photo-1603252109303-2751441dd157?w=800&q=80',
-    sizes: S,
-    colors: ['Đỏ caro', 'Xanh caro'],
-    variants: variants(S, ['Đỏ caro', 'Xanh caro']),
-  },
-  {
-    name: 'Jean Slim Indigo',
-    description: 'Denim indigo stretch, slim fit.',
-    price: 599000,
-    stock: 70,
-    category: 'Quần jean',
-    imageUrl:
-      'https://images.unsplash.com/photo-1542272604-787c3835535d?w=800&q=80',
-    sizes: ['28', '30', '32', '34'],
-    colors: ['Indigo', 'Đen'],
-    variants: variants(['28', '30', '32', '34'], ['Indigo', 'Đen'], 12),
-  },
-  {
-    name: 'Jean Wide Clean',
-    description: 'Ống rộng, wash sạch, mid-rise.',
-    price: 649000,
-    stock: 55,
-    category: 'Quần jean',
-    imageUrl:
-      'https://images.unsplash.com/photo-1475178626620-a4d074967337?w=800&q=80',
-    sizes: ['28', '30', '32', '34'],
-    colors: ['Xanh nhạt', 'Xám'],
-    variants: variants(['28', '30', '32', '34'], ['Xanh nhạt', 'Xám'], 10),
-  },
-  {
-    name: 'Jean Straight Raw',
-    description: 'Straight raw denim, ít wash.',
-    price: 679000,
-    stock: 40,
-    category: 'Quần jean',
-    imageUrl:
-      'https://images.unsplash.com/photo-1604176354204-926873782855?w=800&q=80',
-    sizes: ['28', '30', '32', '34'],
-    colors: ['Raw blue'],
-    variants: variants(['28', '30', '32', '34'], ['Raw blue'], 10),
-  },
-  {
-    name: 'Jean Mom Vintage',
-    description: 'Mom jean vintage wash cho nữ.',
-    price: 589000,
+    name: 'Archive Heavyweight Boxy Tee — Chiaroscuro Edition',
+    brand: 'ENIGMA ARCHIVE',
+    releaseType: 'drop',
+    condition: 'Deadstock',
+    authenticityCode: 'ENG-2026-TEE-008',
+    description:
+      '340gsm combed organic jersey with tonal blind-stitch crest at nape and structured collar rib.',
+    price: 1650000,
     stock: 48,
-    category: 'Quần jean',
-    imageUrl:
-      'https://images.unsplash.com/photo-1582418702059-97ebaf0f5c0a?w=800&q=80',
-    sizes: ['26', '28', '30', '32'],
-    colors: ['Wash sáng', 'Wash đậm'],
-    variants: variants(['26', '28', '30', '32'], ['Wash sáng', 'Wash đậm'], 10),
+    category: 'Hoodies',
+    imageUrl: '/images/enigma/grail-hoodie-shadow.jpg',
+    sizes: ['S', 'M', 'L', 'XL'],
+    colors: ['Obsidian', 'Warm Bone'],
+    variants: variants(['S', 'M', 'L', 'XL'], ['Obsidian', 'Warm Bone'], 6),
   },
   {
-    name: 'Đầm Midi Linen',
-    description: 'Đầm midi linen, dây buộc eo.',
-    price: 729000,
-    stock: 35,
-    category: 'Váy đầm',
-    imageUrl:
-      'https://images.unsplash.com/photo-1595777457583-95e059d581b8?w=800&q=80',
-    sizes: ['S', 'M', 'L'],
-    colors: ['Be', 'Olive', 'Đen'],
-    variants: variants(['S', 'M', 'L'], ['Be', 'Olive', 'Đen'], 8),
-  },
-  {
-    name: 'Đầm Sơ mi Cotton',
-    description: 'Shirt dress cotton, nút trước.',
-    price: 699000,
-    stock: 40,
-    category: 'Váy đầm',
-    imageUrl:
-      'https://images.unsplash.com/photo-1572804013309-59a88b7e8801?w=800&q=80',
-    sizes: ['S', 'M', 'L'],
-    colors: ['Trắng', 'Xanh nhạt'],
-    variants: variants(['S', 'M', 'L'], ['Trắng', 'Xanh nhạt'], 10),
-  },
-  {
-    name: 'Váy Tennis Pleat',
-    description: 'Váy tennis xếp ly, lưng thun.',
-    price: 399000,
-    stock: 50,
-    category: 'Váy đầm',
-    imageUrl:
-      'https://images.unsplash.com/photo-1583496661160-fb5886a0aaaa?w=800&q=80',
-    sizes: ['S', 'M', 'L'],
-    colors: ['Trắng', 'Đen', 'Navy'],
-    variants: variants(['S', 'M', 'L'], ['Trắng', 'Đen', 'Navy'], 10),
-  },
-  {
-    name: 'Đầm Maxi Floral',
-    description: 'Maxi họa tiết hoa, vải voan nhẹ.',
-    price: 789000,
-    stock: 30,
-    category: 'Váy đầm',
-    imageUrl:
-      'https://images.unsplash.com/photo-1496747611176-843222e1e57c?w=800&q=80',
-    sizes: ['S', 'M', 'L'],
-    colors: ['Hoa đỏ', 'Hoa xanh'],
-    variants: variants(['S', 'M', 'L'], ['Hoa đỏ', 'Hoa xanh'], 8),
-  },
-  {
-    name: 'Áo khoác Bomber Nylon',
-    description: 'Bomber nylon nhẹ, túi zip.',
-    price: 849000,
-    stock: 40,
-    category: 'Áo khoác',
-    imageUrl:
-      'https://images.unsplash.com/photo-1551028719-00167b16eac5?w=800&q=80',
-    sizes: S,
-    colors: ['Đen', 'Olive', 'Navy'],
-    variants: variants(S, ['Đen', 'Olive', 'Navy'], 8),
-  },
-  {
-    name: 'Áo khoác Denim Trucker',
-    description: 'Trucker denim classic.',
-    price: 899000,
-    stock: 35,
-    category: 'Áo khoác',
-    imageUrl:
-      'https://images.unsplash.com/photo-1576995853123-5a967fd0e9f3?w=800&q=80',
-    sizes: S,
-    colors: ['Indigo', 'Đen'],
-    variants: variants(S, ['Indigo', 'Đen'], 8),
-  },
-  {
-    name: 'Áo khoác Blazer Soft',
-    description: 'Blazer mềm, 1 nút, dễ mặc công sở.',
-    price: 999000,
-    stock: 28,
-    category: 'Áo khoác',
-    imageUrl:
-      'https://images.unsplash.com/photo-1594938298603-c8148c4dae35?w=800&q=80',
-    sizes: S,
-    colors: ['Be', 'Đen', 'Xám'],
-    variants: variants(S, ['Be', 'Đen', 'Xám'], 6),
-  },
-  {
-    name: 'Áo khoác Windbreaker',
-    description: 'Windbreaker packable, chống gió nhẹ.',
-    price: 759000,
-    stock: 42,
-    category: 'Áo khoác',
-    imageUrl:
-      'https://images.unsplash.com/photo-1544923246-77307dd254cb?w=800&q=80',
-    sizes: S,
-    colors: ['Đen', 'Xanh dương'],
-    variants: variants(S, ['Đen', 'Xanh dương'], 8),
-  },
-  {
-    name: 'Túi Tote Canvas TheBasic',
-    description: 'Tote canvas in logo TheBasic.',
-    price: 279000,
-    stock: 100,
-    category: 'Phụ kiện',
-    imageUrl:
-      'https://images.unsplash.com/photo-1590874103328-eac38a67478a?w=800&q=80',
-    sizes: ['One size'],
-    colors: ['Be', 'Đen'],
-    variants: variants(['One size'], ['Be', 'Đen'], 40),
-  },
-  {
-    name: 'Mũ Bucket Cotton',
-    description: 'Bucket hat cotton wash.',
-    price: 189000,
-    stock: 80,
-    category: 'Phụ kiện',
-    imageUrl:
-      'https://images.unsplash.com/photo-1576871337632-b9aef4c17ab9?w=800&q=80',
-    sizes: ['One size'],
-    colors: ['Be', 'Đen', 'Olive'],
-    variants: variants(['One size'], ['Be', 'Đen', 'Olive'], 25),
-  },
-  {
-    name: 'Thắt lưng Leather Slim',
-    description: 'Thắt lưng da slim, khóa kim loại.',
-    price: 349000,
-    stock: 60,
-    category: 'Phụ kiện',
-    imageUrl:
-      'https://images.unsplash.com/photo-1624222247344-550fb60583fd?w=800&q=80',
-    sizes: ['85', '90', '95', '100'],
-    colors: ['Nâu', 'Đen'],
-    variants: variants(['85', '90', '95', '100'], ['Nâu', 'Đen'], 10),
-  },
-  {
-    name: 'Khăn Linen Soft',
-    description: 'Khăn linen mềm, màu trung tính.',
-    price: 229000,
-    stock: 70,
-    category: 'Phụ kiện',
-    imageUrl:
-      'https://images.unsplash.com/photo-1601924994987-69e26d50dc26?w=800&q=80',
-    sizes: ['One size'],
-    colors: ['Be', 'Xám', 'Olive'],
-    variants: variants(['One size'], ['Be', 'Xám', 'Olive'], 20),
-  },
-  {
-    name: 'Áo thun Graphic Line',
-    description: 'Graphic line art tối giản mặt trước.',
-    price: 269000,
-    stock: 85,
-    category: 'Áo thun',
-    imageUrl:
-      'https://images.unsplash.com/photo-1503342217505-b0a15ec3261c?w=800&q=80',
-    sizes: S,
-    colors: ['Trắng', 'Đen'],
-    variants: variants(S, ['Trắng', 'Đen']),
-  },
-  {
-    name: 'Quần jean Cargo Hybrid',
-    description: 'Jean cargo túi hộp, form relaxed.',
-    price: 719000,
-    stock: 38,
-    category: 'Quần jean',
-    imageUrl:
-      'https://images.unsplash.com/photo-1624378439575-d8705ad7ae80?w=800&q=80',
+    name: 'Selvedge Raw Tapered Denim — 16oz Kuroki Mill',
+    brand: 'ENIGMA ARCHIVE',
+    releaseType: 'archive',
+    condition: 'Unwashed Raw',
+    authenticityCode: 'ENG-2026-DNM-009',
+    description:
+      'Rope-dyed charcoal warp over black weft 16oz Japanese selvedge denim that develops high-contrast silver fades.',
+    price: 4100000,
+    stock: 24,
+    category: 'Bottoms',
+    imageUrl: '/images/enigma/grail-cargo-vanguard.jpg',
     sizes: ['28', '30', '32', '34'],
-    colors: ['Xám đậm', 'Olive'],
-    variants: variants(['28', '30', '32', '34'], ['Xám đậm', 'Olive'], 8),
+    colors: ['Kuroki Black'],
+    variants: variants(['28', '30', '32', '34'], ['Kuroki Black'], 6),
+  },
+  {
+    name: 'Oxidized Sterling Sanctum Chain & Clasp',
+    brand: 'ENIGMA HOROLOGY',
+    releaseType: 'reborn',
+    condition: 'Hand-Forged',
+    authenticityCode: 'ENG-2026-RLC-010',
+    description:
+      'Hand-soldered .925 sterling silver heavy curb link drenched in sulfur patina with engraved monolith box lock.',
+    price: 4950000,
+    stock: 8,
+    category: 'Relics',
+    imageUrl: '/images/enigma/grail-chronograph-relic.jpg',
+    sizes: ['50cm', '55cm'],
+    colors: ['Oxidized Silver'],
+    variants: [
+      { size: '50cm', color: 'Oxidized Silver', stock: 4 },
+      { size: '55cm', color: 'Oxidized Silver', stock: 4 },
+    ],
   },
 ];
 
 export const SEED_REVIEWS = [
   {
     userEmail: 'demo@fashionshop.com',
-    productName: 'Áo thun TheBasic Essential',
+    productName: 'ENIGMA 01 "Obsidian Monolith" High-Top',
     rating: 5,
-    comment: 'Vải mềm, form đẹp, sẽ mua lại.',
+    comment:
+      'Calfskin grain and aged bone sole Rival Rick & Guidi at half the resale markup. NFC tag verified.',
   },
   {
     userEmail: 'lan@fashionshop.com',
-    productName: 'Áo thun TheBasic Essential',
-    rating: 4,
-    comment: 'Màu be rất dễ phối.',
+    productName: 'Shadow Archive 650gsm Sun-Faded Hoodie',
+    rating: 5,
+    comment:
+      '650gsm weight drapes like armor. Hood stands structured without collapsing.',
   },
   {
     userEmail: 'demo@fashionshop.com',
-    productName: 'Jean Slim Indigo',
+    productName: 'Reborn Horsehide Flight Bomber [1-of-12]',
     rating: 5,
-    comment: 'Ôm vừa, không bó quá.',
+    comment:
+      'Museum-level horsehide patina. Heavy Riri zips glide effortlessly.',
   },
   {
     userEmail: 'lan@fashionshop.com',
-    productName: 'Đầm Midi Linen',
+    productName: 'Aether Bone Suede & Carbon Runner',
     rating: 5,
-    comment: 'Mặc mát, lên form sang.',
+    comment: 'Warm bone suede tone is sublime in person. True to EU sizing.',
   },
+] as const;
+
+export const SEED_AUCTIONS = [
+  {
+    title: 'LOT 01 · Prototype Horsehide Bomber [01/01 Atelier Sample]',
+    subtitle: 'Hand-numbered Paris Showroom Sample · Signed Provenance Dossier',
+    imageUrl: '/images/enigma/grail-leather-bomber.jpg',
+    startingBid: 9500000,
+    currentBid: 13200000,
+    minIncrement: 250000,
+    reservePrice: 12000000,
+    hoursFromNow: 6,
+    bids: [
+      { bidderAlias: 'SHADOW_09', amount: 11800000 },
+      { bidderAlias: 'KAELEN_37', amount: 12500000 },
+      { bidderAlias: 'VANGUARD_14', amount: 13200000 },
+    ],
+  },
+  {
+    title: 'LOT 02 · Nocturne Titanium Tourbillon Study #00',
+    subtitle: 'Zero-Series Calibre · Antique Gold Bridge · Basalt Display Case',
+    imageUrl: '/images/enigma/grail-chronograph-relic.jpg',
+    startingBid: 18000000,
+    currentBid: 24500000,
+    minIncrement: 500000,
+    reservePrice: 24000000,
+    hoursFromNow: 2.5,
+    bids: [
+      { bidderAlias: 'MONOLITH_02', amount: 21000000 },
+      { bidderAlias: 'REBORN_77', amount: 23000000 },
+      { bidderAlias: 'CHRONO_11', amount: 24500000 },
+    ],
+  },
+  {
+    title: 'LOT 03 · Obsidian Monolith High-Top [F&F Aged Sole Pair]',
+    subtitle: 'Friends & Family Hand-Distressed Edition · EU 42',
+    imageUrl: '/images/enigma/grail-sneaker-obsidian.jpg',
+    startingBid: 6500000,
+    currentBid: 8400000,
+    minIncrement: 200000,
+    reservePrice: 9000000,
+    hoursFromNow: 0.75,
+    bids: [
+      { bidderAlias: 'TOKYO_88', amount: 7600000 },
+      { bidderAlias: 'ARCHIVE_21', amount: 8400000 },
+    ],
+  },
+] as const;
+
+export const SEED_MYSTERY_BOXES = [
+  {
+    tierSlug: 'initiate-box',
+    name: 'Initiate Box',
+    subtitle: 'Essential Entry into the Enigma Archive',
+    description:
+      '2 authenticated Enigma garments & accessories tailored to your Taste Codex silhouette. Guaranteed minimum retail value 5,200,000₫.',
+    price: 3490000,
+    guaranteedMinValue: 5200000,
+    itemCount: 2,
+    imageUrl: '/images/enigma/mystery-chest.jpg',
+    archetypeMatch: ['MONOLITH_MINIMALIST', 'SHADOW_ARCHIVE'],
+    possibleDrops: [
+      { title: '650gsm Sun-Faded Hoodie', rarity: 'Archive Core', odds: '48%' },
+      {
+        title: 'Chiaroscuro Boxy Tee + Relic Accessory',
+        rarity: 'Curated Set',
+        odds: '37%',
+      },
+      {
+        title: 'Selvedge Raw Tapered Denim Upgrade',
+        rarity: 'Vault Hit',
+        odds: '15%',
+      },
+    ],
+  },
+  {
+    tierSlug: 'inner-circle-chest',
+    name: 'Inner Circle Chest',
+    subtitle: 'High-Heat Footwear, Waxed Utility & Heavyweight Layers',
+    description:
+      '3 curated pieces anchored by either a signature Sneaker rotation or Technical Outerwear piece matched to your 8-step Codex.',
+    price: 7900000,
+    guaranteedMinValue: 11800000,
+    itemCount: 3,
+    imageUrl: '/images/enigma/mystery-chest.jpg',
+    archetypeMatch: ['SHADOW_ARCHIVE', 'CONCRETE_VANGUARD'],
+    possibleDrops: [
+      {
+        title: 'Aether Bone Suede & Carbon Runner',
+        rarity: 'High Heat',
+        odds: '42%',
+      },
+      {
+        title: 'Concrete Vanguard Waxed Cargo + Hoodie',
+        rarity: 'Vanguard Pack',
+        odds: '40%',
+      },
+      {
+        title: 'Obsidian Monolith High-Top Grail',
+        rarity: 'Grail Pull',
+        odds: '18%',
+      },
+    ],
+  },
+  {
+    tierSlug: 'grail-vault',
+    name: 'Grail Vault',
+    subtitle: 'Numbered Reborn Customs, Titanium Horology & 1-of-1 Relics',
+    description:
+      'Sealed anodized aluminum vault chest containing 3–4 flagship collector pieces, including guaranteed Reborn Atelier or Grail-tier allocation.',
+    price: 15900000,
+    guaranteedMinValue: 24500000,
+    itemCount: 4,
+    imageUrl: '/images/enigma/mystery-chest.jpg',
+    archetypeMatch: ['NEO_RENAISSANCE', 'SHADOW_ARCHIVE'],
+    possibleDrops: [
+      {
+        title: 'Reborn Horsehide Flight Bomber [1-of-12]',
+        rarity: '1-of-12 Custom',
+        odds: '38%',
+      },
+      {
+        title: 'Monolith Virgin Wool Overcoat + Sterling Chain',
+        rarity: 'Atelier Couture',
+        odds: '42%',
+      },
+      {
+        title: 'Nocturne Skeleton Titanium Chronograph Set',
+        rarity: 'Mythic Grail',
+        odds: '20%',
+      },
+    ],
+  },
+];
+
+export const SEED_VOUCHERS = [
+  {
+    code: 'ENIGMA15',
+    description: 'Inner Circle Initiation — 15% Privilege (Max 2,500,000₫)',
+    discountType: DiscountType.PERCENTAGE,
+    discountValue: 15,
+    minOrderAmount: 0,
+    maxDiscountAmount: 2500000,
+    usageLimit: 9999,
+    isSecretInitiation: true,
+  },
+  {
+    code: 'CULT10',
+    description: 'First Drop Welcome — 10% Off Orders Above 2,000,000₫',
+    discountType: DiscountType.PERCENTAGE,
+    discountValue: 10,
+    minOrderAmount: 2000000,
+    maxDiscountAmount: 1500000,
+    usageLimit: 500,
+    isSecretInitiation: false,
+  },
+  {
+    code: 'VAULT500K',
+    description: '500,000₫ Direct Vault Credit on Grail Orders >= 6,000,000₫',
+    discountType: DiscountType.FIXED,
+    discountValue: 500000,
+    minOrderAmount: 6000000,
+    maxDiscountAmount: 500000,
+    usageLimit: 250,
+    isSecretInitiation: false,
+  },
+] as const;
+
+export const SEED_CONCIERGE = [
+  {
+    requesterName: 'Kaelen Vinh',
+    requesterEmail: 'demo@fashionshop.com',
+    itemName: 'Rick Owens Geobasket Ponyhair Archive 2014',
+    brand: 'Rick Owens',
+    size: 'EU 42',
+    targetPrice: 16500000,
+    notes: 'Prefer original box and tonal laces. Clean creasing acceptable.',
+    status: ConciergeStatus.REVIEWING,
+  },
+  {
+    requesterName: 'Lan Nguyen',
+    requesterEmail: 'lan@fashionshop.com',
+    itemName: 'Maison Margiela Artisanal Tabi Boot Paint Splatter',
+    brand: 'Maison Margiela',
+    size: 'EU 38',
+    targetPrice: 18200000,
+    notes: 'Matte charcoal or white over-paint over black leather.',
+    status: ConciergeStatus.COUNTERED,
+    counterOfferPrice: 19500000,
+    adminNotes:
+      'Located Deadstock pair in Tokyo partner vault; includes wooden shoe trees.',
+  },
+] as const;
+
+export const SEED_SAMPLE_ORDERS = [
   {
     userEmail: 'demo@fashionshop.com',
-    productName: 'Áo khoác Bomber Nylon',
-    rating: 4,
-    comment: 'Nhẹ và ấm vừa phải.',
+    productName: 'ENIGMA 01 "Obsidian Monolith" High-Top',
+    size: '42',
+    color: 'Obsidian',
+    quantity: 1,
+    shippingName: 'Kaelen Vinh',
+    shippingPhone: '0909123456',
+    shippingAddress: '88 Đồng Khởi, Quận 1, TP. Hồ Chí Minh',
+    paymentMethod: PaymentMethod.VNPAY,
+    paymentStatus: PaymentStatus.PAID,
+    status: OrderStatus.DELIVERED,
   },
   {
     userEmail: 'lan@fashionshop.com',
-    productName: 'Túi Tote Canvas TheBasic',
-    rating: 5,
-    comment: 'Chắc chắn, đựng laptop 13" ổn.',
+    productName: 'Shadow Archive 650gsm Sun-Faded Hoodie',
+    size: 'M',
+    color: 'Smoked Charcoal',
+    quantity: 1,
+    shippingName: 'Lan Nguyen',
+    shippingPhone: '0912345678',
+    shippingAddress: '24 Tràng Tiền, Hoàn Kiếm, Hà Nội',
+    paymentMethod: PaymentMethod.COD,
+    paymentStatus: PaymentStatus.UNPAID,
+    status: OrderStatus.SHIPPING,
   },
 ] as const;

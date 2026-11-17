@@ -52,8 +52,14 @@ export class Order {
     quantity: number;
   }[];
 
-  @Column({ type: 'decimal', precision: 10, scale: 2 })
+  @Column({ type: 'decimal', precision: 12, scale: 2 })
   total: number;
+
+  @Column({ type: 'varchar', length: 50, nullable: true })
+  voucherCode: string | null;
+
+  @Column({ type: 'decimal', precision: 12, scale: 2, default: 0 })
+  discountAmount: number;
 
   // Shipping address
   @Column({ type: 'varchar', length: 255 })
