@@ -1,6 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { GoogleGenerativeAI, SchemaType } from '@google/generative-ai';
 import { StyleProfile } from './entities/style-profile.entity';
 
 export type GeminiPlannedToolCall =
@@ -32,6 +31,86 @@ export type GeminiPlannedToolCall =
       args: { code: string; subtotal?: number };
     };
 
+const FUNCTION_DECLARATIONS = [
+  {
+    name: 'search_products_hybrid',
+    description:
+      'Search authenticated luxury streetwear, sneakers, outerwear, and grails using hybrid BM25 + filters',
+    parameters: {
+      type: 'OBJECT',
+      properties: {
+        query: { type: 'STRING' },
+        category: { type: 'STRING' },
+        color: { type: 'STRING' },
+        size: { type: 'STRING' },
+        minPrice: { type: 'NUMBER' },
+        maxPrice: { type: 'NUMBER' },
+      },
+    },
+  },
+  {
+    name: 'check_variant_stock',
+    description:
+      'Check live SKU size and colorway stock for a specific product',
+    parameters: {
+      type: 'OBJECT',
+      properties: {
+        productQuery: { type: 'STRING' },
+        size: { type: 'STRING' },
+      },
+      required: ['productQuery'],
+    },
+  },
+  {
+    name: 'get_live_auctions',
+    description:
+      'Fetch currently live Grail auction lots, current bids, and countdowns',
+    parameters: {
+      type: 'OBJECT',
+      properties: {},
+    },
+  },
+  {
+    name: 'get_order_status',
+    description: 'Track customer order status by order ID or latest order',
+    parameters: {
+      type: 'OBJECT',
+      properties: {
+        orderId: { type: 'NUMBER' },
+      },
+    },
+  },
+  {
+    name: 'validate_coupon',
+    description:
+      'Validate a promotional or secret initiation coupon code like ENIGMA15',
+    parameters: {
+      type: 'OBJECT',
+      properties: {
+        code: { type: 'STRING' },
+        subtotal: { type: 'NUMBER' },
+      },
+      required: ['code'],
+    },
+  },
+];
+
+interface GeminiResponsePart {
+  text?: string;
+  functionCall?: {
+    name?: string;
+    args?: Record<string, unknown>;
+  };
+}
+
+interface GeminiGenerateContentResponse {
+  candidates?: Array<{
+    content?: {
+      parts?: GeminiResponsePart[];
+    };
+  }>;
+}
+
 @Injectable()
 export class GeminiClientService {
   private readonly logger = new Logger(GeminiClientService.name);
@@ -40,19 +119,23 @@ export class GeminiClientService {
   constructor(private readonly configService: ConfigService) {
     this.modelName = this.configService.get<string>(
       'GEMINI_MODEL',
-      'gemini-1.5-flash',
+      'gemini-2.5-flash',
     );
   }
 
-  /**
-   * Safe check — NEVER throws when GEMINI_API_KEY is missing, empty, or placeholder.
-   */
-  hasValidApiKey(): boolean {
-    const raw = (
+  private getRawApiKey(): string {
+    return (
       this.configService.get<string>('GEMINI_API_KEY') ??
       this.configService.get<string>('gemini_api') ??
       ''
     ).trim();
+  }
+
+  /**
+   * Safe check — supports both Google AI Studio (`AIza...`) and Vertex AI Express Mode (`AQ....`) keys.
+   */
+  hasValidApiKey(): boolean {
+    const raw = this.getRawApiKey();
     if (!raw) return false;
     if (
       raw === 'your_gemini_api_key' ||
@@ -64,147 +147,85 @@ export class GeminiClientService {
     return true;
   }
 
-  private getClientOrNull(): GoogleGenerativeAI | null {
+  /**
+   * Dispatches native `generateContent` requests across Vertex AI Express (`AQ.`) and AI Studio (`AIza`) endpoints.
+   */
+  private async callGenerateContent(
+    payload: Record<string, unknown>,
+  ): Promise<GeminiGenerateContentResponse | null> {
     if (!this.hasValidApiKey()) return null;
-    const apiKey = (
-      this.configService.get<string>('GEMINI_API_KEY') ??
-      this.configService.get<string>('gemini_api') ??
-      ''
-    ).trim();
-    return new GoogleGenerativeAI(apiKey);
+    const apiKey = this.getRawApiKey();
+    const encodedKey = encodeURIComponent(apiKey);
+    const vertexUrl = `https://aiplatform.googleapis.com/v1/publishers/google/models/${this.modelName}:generateContent?key=${encodedKey}`;
+    const studioUrl = `https://generativelanguage.googleapis.com/v1beta/models/${this.modelName}:generateContent?key=${encodedKey}`;
+    const endpoints = apiKey.startsWith('AQ.')
+      ? [vertexUrl, studioUrl]
+      : [studioUrl, vertexUrl];
+
+    let lastErr = 'unknown';
+    for (const url of endpoints) {
+      try {
+        const res = await fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+          signal: AbortSignal.timeout(18000),
+        });
+        if (res.ok) {
+          return (await res.json()) as GeminiGenerateContentResponse;
+        }
+        lastErr = `HTTP ${res.status}`;
+      } catch (err) {
+        lastErr = err instanceof Error ? err.message : 'network error';
+      }
+    }
+
+    this.logger.warn(
+      `Gemini generateContent unavailable (${lastErr}), falling back to local Hybrid RAG router.`,
+    );
+    return null;
   }
 
   /**
-   * Uses Gemini Function Calling when GEMINI_API_KEY is configured.
-   * Returns null if key is missing or Gemini request fails so caller seamlessly uses HybridRagRouterService.
+   * Uses Gemini Function Calling when GEMINI_API_KEY is configured (`AQ.` Vertex Express or `AIza` AI Studio).
    */
   async planToolCall(
     userMessage: string,
     styleProfile?: StyleProfile | null,
   ): Promise<GeminiPlannedToolCall | null> {
-    const client = this.getClientOrNull();
-    if (!client) return null;
-
-    const model = client.getGenerativeModel({
-      model: this.modelName,
-      tools: [
-        {
-          functionDeclarations: [
-            {
-              name: 'search_products_hybrid',
-              description:
-                'Search authenticated luxury streetwear, sneakers, outerwear, and grails using hybrid BM25 + filters',
-              parameters: {
-                type: SchemaType.OBJECT,
-                properties: {
-                  query: { type: SchemaType.STRING },
-                  category: { type: SchemaType.STRING },
-                  color: { type: SchemaType.STRING },
-                  size: { type: SchemaType.STRING },
-                  minPrice: { type: SchemaType.NUMBER },
-                  maxPrice: { type: SchemaType.NUMBER },
-                },
-              },
-            },
-            {
-              name: 'check_variant_stock',
-              description:
-                'Check live SKU size and colorway stock for a specific product',
-              parameters: {
-                type: SchemaType.OBJECT,
-                properties: {
-                  productQuery: { type: SchemaType.STRING },
-                  size: { type: SchemaType.STRING },
-                },
-                required: ['productQuery'],
-              },
-            },
-            {
-              name: 'get_live_auctions',
-              description:
-                'Fetch currently live Grail auction lots, current bids, and countdowns',
-              parameters: {
-                type: SchemaType.OBJECT,
-                properties: {},
-              },
-            },
-            {
-              name: 'get_order_status',
-              description:
-                'Track customer order status by order ID or latest order',
-              parameters: {
-                type: SchemaType.OBJECT,
-                properties: {
-                  orderId: { type: SchemaType.NUMBER },
-                },
-              },
-            },
-            {
-              name: 'validate_coupon',
-              description:
-                'Validate a promotional or secret initiation coupon code like ENIGMA15',
-              parameters: {
-                type: SchemaType.OBJECT,
-                properties: {
-                  code: { type: SchemaType.STRING },
-                  subtotal: { type: SchemaType.NUMBER },
-                },
-                required: ['code'],
-              },
-            },
-          ],
-        },
-      ],
-    });
+    if (!this.hasValidApiKey()) return null;
 
     const codexContext = styleProfile?.archetype
       ? `Customer Taste Codex Archetype: ${styleProfile.archetype} (${(styleProfile.keywords ?? []).join(', ')})`
       : 'No saved Taste Codex yet.';
 
-    try {
-      const result = await model.generateContent({
-        contents: [
-          {
-            role: 'user',
-            parts: [
-              {
-                text: [
-                  'You are the ENIGMA Archive Stylist & Grail Concierge.',
-                  'Select the single most relevant tool call if the user asks about products, stock, auctions, orders, or coupon codes.',
-                  codexContext,
-                  `User message: ${userMessage}`,
-                ].join('\n'),
-              },
-            ],
-          },
-        ],
-      });
+    const data = await this.callGenerateContent({
+      contents: [
+        {
+          role: 'user',
+          parts: [
+            {
+              text: [
+                'You are the ENIGMA Archive Stylist & Grail Concierge.',
+                'Select the single most relevant tool call if the user asks about products, stock, auctions, orders, or coupon codes.',
+                codexContext,
+                `User message: ${userMessage}`,
+              ].join('\n'),
+            },
+          ],
+        },
+      ],
+      tools: [{ functionDeclarations: FUNCTION_DECLARATIONS }],
+    });
 
-      const parts = result.response.candidates?.[0]?.content?.parts ?? [];
-      const fnPart = parts.find((part) =>
-        Boolean((part as { functionCall?: unknown }).functionCall),
-      ) as
-        | {
-            functionCall?: {
-              name: GeminiPlannedToolCall['name'];
-              args?: Record<string, unknown>;
-            };
-          }
-        | undefined;
+    const parts = data?.candidates?.[0]?.content?.parts ?? [];
+    const fnPart = parts.find((part) => Boolean(part.functionCall?.name));
+    if (!fnPart?.functionCall?.name) return null;
 
-      if (!fnPart?.functionCall?.name) return null;
-      return {
-        name: fnPart.functionCall.name,
-        args: (fnPart.functionCall.args ?? {}) as never,
-      };
-    } catch (error) {
-      this.logger.warn(
-        `Gemini function-calling unavailable, falling back to local Hybrid RAG router: ${
-          error instanceof Error ? error.message : 'unknown'
-        }`,
-      );
-      return null;
-    }
+    return {
+      name: fnPart.functionCall.name as GeminiPlannedToolCall['name'],
+      args: (fnPart.functionCall.args ?? {}) as never,
+    };
   }
 
   async synthesizeStylistReply(
@@ -212,23 +233,30 @@ export class GeminiClientService {
     contextSummary: string,
     fallbackReply: string,
   ): Promise<string> {
-    const client = this.getClientOrNull();
-    if (!client) return fallbackReply;
+    const data = await this.callGenerateContent({
+      contents: [
+        {
+          role: 'user',
+          parts: [
+            {
+              text: [
+                'You are ENIGMA — an avant-garde luxury streetwear & grail auction stylist.',
+                'Reply in the same language as the user (Vietnamese or English) in 1-2 crisp, refined editorial sentences.',
+                `User message: ${userMessage}`,
+                `Live Vault Context: ${contextSummary}`,
+              ].join('\n'),
+            },
+          ],
+        },
+      ],
+      generationConfig: { temperature: 0.25, maxOutputTokens: 280 },
+    });
 
-    try {
-      const model = client.getGenerativeModel({ model: this.modelName });
-      const result = await model.generateContent(
-        [
-          'You are ENIGMA — an avant-garde luxury streetwear & grail auction stylist.',
-          'Reply in the same language as the user (Vietnamese or English) in 1-2 crisp, refined editorial sentences.',
-          `User message: ${userMessage}`,
-          `Live Vault Context: ${contextSummary}`,
-        ].join('\n'),
-      );
-      const text = result.response.text().trim();
-      return text || fallbackReply;
-    } catch {
-      return fallbackReply;
-    }
+    const parts = data?.candidates?.[0]?.content?.parts ?? [];
+    const text = parts
+      .map((p) => (typeof p.text === 'string' ? p.text : ''))
+      .join('')
+      .trim();
+    return text || fallbackReply;
   }
 }
