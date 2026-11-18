@@ -148,7 +148,11 @@ export class GeminiClientService {
   }
 
   /**
-   * Dispatches native `generateContent` requests across Vertex AI Express (`AQ.`) and AI Studio (`AIza`) endpoints.
+   * Dispatches native `generateContent` requests across a model fallback
+   * chain (configured model first, then the other Gemini flash models) and,
+   * per model, across Vertex AI Express (`AQ.`) and AI Studio (`AIza`)
+   * endpoints. A single overloaded model (503) no longer disables the
+   * Gemini tier — the chain falls through to the next model.
    */
   private async callGenerateContent(
     payload: Record<string, unknown>,
@@ -156,27 +160,38 @@ export class GeminiClientService {
     if (!this.hasValidApiKey()) return null;
     const apiKey = this.getRawApiKey();
     const encodedKey = encodeURIComponent(apiKey);
-    const vertexUrl = `https://aiplatform.googleapis.com/v1/publishers/google/models/${this.modelName}:generateContent?key=${encodedKey}`;
-    const studioUrl = `https://generativelanguage.googleapis.com/v1beta/models/${this.modelName}:generateContent?key=${encodedKey}`;
-    const endpoints = apiKey.startsWith('AQ.')
-      ? [vertexUrl, studioUrl]
-      : [studioUrl, vertexUrl];
+    const modelChain = [
+      ...new Set([
+        this.modelName,
+        'gemini-3.8-flash',
+        'gemini-3.5-flash',
+        'gemini-3-flash-preview',
+      ]),
+    ];
 
     let lastErr = 'unknown';
-    for (const url of endpoints) {
-      try {
-        const res = await fetch(url, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload),
-          signal: AbortSignal.timeout(18000),
-        });
-        if (res.ok) {
-          return (await res.json()) as GeminiGenerateContentResponse;
+    for (const model of modelChain) {
+      const vertexUrl = `https://aiplatform.googleapis.com/v1/publishers/google/models/${model}:generateContent?key=${encodedKey}`;
+      const studioUrl = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodedKey}`;
+      const endpoints = apiKey.startsWith('AQ.')
+        ? [vertexUrl, studioUrl]
+        : [studioUrl, vertexUrl];
+
+      for (const url of endpoints) {
+        try {
+          const res = await fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload),
+            signal: AbortSignal.timeout(18000),
+          });
+          if (res.ok) {
+            return (await res.json()) as GeminiGenerateContentResponse;
+          }
+          lastErr = `${model} HTTP ${res.status}`;
+        } catch (err) {
+          lastErr = `${model} ${err instanceof Error ? err.message : 'network error'}`;
         }
-        lastErr = `HTTP ${res.status}`;
-      } catch (err) {
-        lastErr = err instanceof Error ? err.message : 'network error';
       }
     }
 
