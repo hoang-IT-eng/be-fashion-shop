@@ -119,7 +119,7 @@ export class GeminiClientService {
   constructor(private readonly configService: ConfigService) {
     this.modelName = this.configService.get<string>(
       'GEMINI_MODEL',
-      'gemini-2.5-flash',
+      'gemini-3.8-flash',
     );
   }
 
