@@ -163,21 +163,29 @@ export class GeminiClientService {
     const modelChain = [
       ...new Set([
         this.modelName,
+        'gemini-3.1-flash-lite',
+        'gemini-2.5-flash-lite',
         'gemini-3.8-flash',
         'gemini-3.5-flash',
         'gemini-3-flash-preview',
       ]),
     ];
 
-    let lastErr = 'unknown';
+    const attempts: string[] = [];
     for (const model of modelChain) {
       const vertexUrl = `https://aiplatform.googleapis.com/v1/publishers/google/models/${model}:generateContent?key=${encodedKey}`;
       const studioUrl = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodedKey}`;
-      const endpoints = apiKey.startsWith('AQ.')
-        ? [vertexUrl, studioUrl]
-        : [studioUrl, vertexUrl];
+      const endpoints: Array<[string, string]> = apiKey.startsWith('AQ.')
+        ? [
+            ['vertex', vertexUrl],
+            ['studio', studioUrl],
+          ]
+        : [
+            ['studio', studioUrl],
+            ['vertex', vertexUrl],
+          ];
 
-      for (const url of endpoints) {
+      for (const [label, url] of endpoints) {
         try {
           const res = await fetch(url, {
             method: 'POST',
@@ -188,15 +196,18 @@ export class GeminiClientService {
           if (res.ok) {
             return (await res.json()) as GeminiGenerateContentResponse;
           }
-          lastErr = `${model} HTTP ${res.status}`;
+          const body = (await res.text().catch(() => '')).slice(0, 160);
+          attempts.push(`${model}/${label} HTTP ${res.status} ${body}`);
         } catch (err) {
-          lastErr = `${model} ${err instanceof Error ? err.message : 'network error'}`;
+          attempts.push(
+            `${model}/${label} ${err instanceof Error ? err.message : 'network error'}`,
+          );
         }
       }
     }
 
     this.logger.warn(
-      `Gemini generateContent unavailable (${lastErr}), falling back to local Hybrid RAG router.`,
+      `Gemini generateContent unavailable [${attempts.join(' | ')}], falling back to local Hybrid RAG router.`,
     );
     return null;
   }
