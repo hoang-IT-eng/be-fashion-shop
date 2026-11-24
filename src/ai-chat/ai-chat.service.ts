@@ -40,6 +40,17 @@ export class AiChatService {
 
     const trimmedMessage = params.input.message.trim();
 
+    // Load last 6 messages for multi-turn conversation memory before persisting the current turn
+    const recentMessages = await this.messageRepo.find({
+      where: { sessionId: session.id },
+      order: { createdAt: 'DESC' },
+      take: 6,
+    });
+    const history = recentMessages.reverse().map((m) => ({
+      role: m.role,
+      content: m.content,
+    }));
+
     await this.messageRepo.save(
       this.messageRepo.create({
         sessionId: session.id,
@@ -66,6 +77,7 @@ export class AiChatService {
       const planned = await this.geminiClientService.planToolCall(
         trimmedMessage,
         styleProfile,
+        history,
       );
       if (planned) {
         engine = 'gemini-tools';
@@ -94,37 +106,47 @@ export class AiChatService {
               ),
             );
           }
+          const contextPayload = res.strictEmpty
+            ? JSON.stringify({
+                matched: 0,
+                strictFilterEmpty: true,
+                appliedFilters: filters,
+              })
+            : JSON.stringify(
+                products.map((p) => ({ name: p.name, price: Number(p.price) })),
+              );
+          const fallbackText = res.strictEmpty
+            ? 'No archival pieces matched your exact price or size filter. Try widening your budget or size range.'
+            : `Curated ${products.length} pieces matching your brief.`;
           replyMessage = await this.geminiClientService.synthesizeStylistReply(
             trimmedMessage,
-            JSON.stringify(
-              products.map((p) => ({ name: p.name, price: Number(p.price) })),
-            ),
-            `Curated ${products.length} pieces matching your brief.`,
+            contextPayload,
+            fallbackText,
+            history,
           );
         } else if (planned.name === 'check_variant_stock') {
-          const stockInfo = await this.hybridRagRouter.checkVariantStock(
+          const stockResult = await this.hybridRagRouter.checkVariantStock(
             planned.args.productQuery,
             planned.args.size,
           );
-          const res = await this.hybridRagRouter.searchProductsHybrid(
-            planned.args.productQuery,
-            { size: planned.args.size },
-            3,
-          );
-          products = res.products;
+          products = stockResult.products;
           if (products.length > 0) {
             uiBlocks.push(
               this.hybridRagRouter.buildProductCardsBlock(
                 'LIVE SKU STOCK VERIFICATION',
                 products,
-                res.scores,
+                stockResult.scores,
               ),
             );
           }
+          const fallbackText = stockResult.strictEmpty
+            ? 'No matching pieces are currently stocked in that exact size.'
+            : `Verified live variant stock across ${products.length} archive items.`;
           replyMessage = await this.geminiClientService.synthesizeStylistReply(
             trimmedMessage,
-            JSON.stringify(stockInfo),
-            `Verified live variant stock across ${products.length} archive items.`,
+            JSON.stringify(stockResult.stockInfo),
+            fallbackText,
+            history,
           );
         } else if (planned.name === 'get_live_auctions') {
           const lots = await this.hybridRagRouter.getLiveAuctions();
@@ -139,26 +161,34 @@ export class AiChatService {
             trimmedMessage,
             JSON.stringify(lots),
             `${lots.length} Grail auction lots are currently live.`,
+            history,
           );
         } else if (planned.name === 'get_order_status') {
-          const order = await this.hybridRagRouter.getOrderStatus({
-            orderId: planned.args.orderId,
-            userId: params.userId,
-          });
-          if (order) {
-            uiBlocks.push({
-              kind: 'order_stepper',
-              title: `ORDER #${order.id} TELEMETRY`,
-              order,
+          if (!params.userId) {
+            replyMessage =
+              'Please sign in to your NOCTURNE account to view live order telemetry.';
+          } else {
+            const order = await this.hybridRagRouter.getOrderStatus({
+              orderId: planned.args.orderId,
+              userId: params.userId,
             });
+            if (order) {
+              uiBlocks.push({
+                kind: 'order_stepper',
+                title: `ORDER #${order.id} TELEMETRY`,
+                order,
+              });
+            }
+            replyMessage =
+              await this.geminiClientService.synthesizeStylistReply(
+                trimmedMessage,
+                JSON.stringify(order),
+                order
+                  ? `Order #${order.id} is currently ${order.status.toUpperCase()}.`
+                  : 'No matching order was found on your account. Verify the order number and try again.',
+                history,
+              );
           }
-          replyMessage = await this.geminiClientService.synthesizeStylistReply(
-            trimmedMessage,
-            JSON.stringify(order),
-            order
-              ? `Order #${order.id} is currently ${order.status.toUpperCase()}.`
-              : 'Specify your order number or sign in to view live order telemetry.',
-          );
         } else if (planned.name === 'validate_coupon') {
           const coupon = await this.hybridRagRouter.validateCoupon(
             planned.args.code,
@@ -168,6 +198,7 @@ export class AiChatService {
             trimmedMessage,
             JSON.stringify(coupon),
             coupon.message,
+            history,
           );
         }
       }
@@ -240,7 +271,17 @@ export class AiChatService {
         const existing = await this.sessionRepo.findOneBy({
           id: params.sessionId,
         });
-        if (existing) return existing;
+        if (existing) {
+          const isOwned =
+            params.userId !== undefined
+              ? existing.userId === params.userId
+              : existing.isGuest &&
+                existing.userId === null &&
+                existing.guestId === (params.guestId ?? null);
+          if (isOwned) {
+            return existing;
+          }
+        }
       } catch {
         // Ignore non-UUID client session IDs and issue a clean DB session
       }

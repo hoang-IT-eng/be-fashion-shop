@@ -138,12 +138,43 @@ describe('HybridRagRouterService (Zero-Key Fallback & Tool-Use)', () => {
     expect(res.uiBlocks[0]?.kind).toBe('auction_card');
   });
 
-  it('routes order tracking queries to get_order_status and emits order_stepper', async () => {
+  it('routes authenticated order tracking queries to get_order_status with isAdmin=false and emits order_stepper', async () => {
+    const res = await router.routeAndExecute({
+      message: 'Kiểm tra đơn hàng #12',
+      userId: 5,
+    });
+
+    expect(res.toolsInvoked).toContain('get_order_status');
+    expect(res.uiBlocks[0]?.kind).toBe('order_stepper');
+  });
+
+  it('blocks unauthenticated guest order tracking (prevents Order IDOR)', async () => {
     const res = await router.routeAndExecute({
       message: 'Kiểm tra đơn hàng #12',
     });
 
     expect(res.toolsInvoked).toContain('get_order_status');
-    expect(res.uiBlocks[0]?.kind).toBe('order_stepper');
+    expect(res.uiBlocks).toHaveLength(0);
+    expect(res.message.toLowerCase()).toContain('đăng nhập');
+  });
+
+  it('does not misroute "order 2 hoodies" as an order tracking query', async () => {
+    const res = await router.routeAndExecute({
+      message: 'I want to order 2 hoodies',
+      userId: 5,
+    });
+
+    expect(res.toolsInvoked).not.toContain('get_order_status');
+    expect(res.toolsInvoked).toContain('search_products_hybrid');
+  });
+
+  it('does not silently reset to all products when strict price filter yields 0 matches', async () => {
+    const res = await router.routeAndExecute({
+      message: 'Find sneakers under 500k',
+    });
+
+    expect(res.products).toHaveLength(0);
+    expect(res.uiBlocks).toHaveLength(0);
+    expect(res.message.toLowerCase()).toContain('no archival pieces');
   });
 });
