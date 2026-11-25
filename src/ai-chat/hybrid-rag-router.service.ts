@@ -55,14 +55,31 @@ export function tokenize(text: string): string[] {
   return normalized.split(/[^a-z0-9]+/).filter((tok) => tok.length >= 2);
 }
 
+const PRODUCTS_CACHE_TTL_MS = 60_000;
+
 @Injectable()
 export class HybridRagRouterService {
+  private productsCache: { data: Product[]; expiresAt: number } | null = null;
+
   constructor(
     private readonly productsService: ProductsService,
     private readonly auctionsService: AuctionsService,
     private readonly ordersService: OrdersService,
     private readonly vouchersService: VouchersService,
   ) {}
+
+  private async getActiveProductsCached(): Promise<Product[]> {
+    const now = Date.now();
+    if (this.productsCache && this.productsCache.expiresAt > now) {
+      return this.productsCache.data;
+    }
+    const data = await this.productsService.findAllActiveWithVariants();
+    this.productsCache = {
+      data,
+      expiresAt: now + PRODUCTS_CACHE_TTL_MS,
+    };
+    return data;
+  }
 
   /**
    * Level 2 Hybrid BM25 + Metadata RAG search over real DB catalog
@@ -71,8 +88,12 @@ export class HybridRagRouterService {
     query: string,
     filters: ProductSearchFilters = {},
     limit = 6,
-  ): Promise<{ products: Product[]; scores: Map<number, number> }> {
-    const allProducts = await this.productsService.findAllActiveWithVariants();
+  ): Promise<{
+    products: Product[];
+    scores: Map<number, number>;
+    strictEmpty?: boolean;
+  }> {
+    const allProducts = await this.getActiveProductsCached();
     if (allProducts.length === 0) {
       return { products: [], scores: new Map() };
     }
@@ -98,8 +119,13 @@ export class HybridRagRouterService {
     }
     const queryTerms = Array.from(expandedTerms);
 
+    const hasHardFilters =
+      filters.minPrice !== undefined ||
+      filters.maxPrice !== undefined ||
+      Boolean(filters.size);
+
     // Filter pass for hard constraints (price, explicit size)
-    let candidates = allProducts.filter((p) => {
+    const candidates = allProducts.filter((p) => {
       const price = Number(p.price);
       if (filters.minPrice !== undefined && price < filters.minPrice) {
         return false;
@@ -118,7 +144,10 @@ export class HybridRagRouterService {
     });
 
     if (candidates.length === 0) {
-      candidates = allProducts;
+      if (hasHardFilters) {
+        return { products: [], scores: new Map(), strictEmpty: true };
+      }
+      return { products: [], scores: new Map() };
     }
 
     // Build BM25 corpus (k1 = 1.5, b = 0.75)
@@ -194,14 +223,15 @@ export class HybridRagRouterService {
 
   /**
    * Tool: check_variant_stock
+   * Returns stock details alongside the matched products and scores in a single search pass.
    */
   async checkVariantStock(productQuery: string, size?: string) {
-    const { products } = await this.searchProductsHybrid(
+    const { products, scores, strictEmpty } = await this.searchProductsHybrid(
       productQuery,
       { size },
       3,
     );
-    return products.map((p) => ({
+    const stockInfo = products.map((p) => ({
       productId: p.id,
       name: p.name,
       totalStock: p.stock,
@@ -219,6 +249,7 @@ export class HybridRagRouterService {
           sku: v.sku,
         })),
     }));
+    return { stockInfo, products, scores, strictEmpty };
   }
 
   /**
@@ -231,26 +262,30 @@ export class HybridRagRouterService {
 
   /**
    * Tool: get_order_status
+   * Strictly requires an authenticated userId and NEVER elevates to isAdmin=true.
    */
   async getOrderStatus(params: { orderId?: number; userId?: number }) {
+    if (!params.userId) {
+      return null;
+    }
+
     try {
       if (params.orderId) {
         const order = await this.ordersService.getOrderById(
           params.orderId,
           params.userId,
-          params.userId === undefined,
+          false,
         );
         return this.formatOrderStepper(order);
       }
-      if (params.userId) {
-        const myOrders = await this.ordersService.getMyOrders(params.userId);
-        if (myOrders.length > 0) {
-          const latest = [...myOrders].sort(
-            (a, b) =>
-              new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
-          )[0];
-          return this.formatOrderStepper(latest);
-        }
+
+      const myOrders = await this.ordersService.getMyOrders(params.userId);
+      if (myOrders.length > 0) {
+        const latest = [...myOrders].sort(
+          (a, b) =>
+            new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+        )[0];
+        return this.formatOrderStepper(latest);
       }
       return null;
     } catch {
@@ -349,14 +384,36 @@ export class HybridRagRouterService {
     }
 
     // 2. Check Order Tracking Intent
-    const orderIdMatch = raw.match(/#?(\d{1,6})/);
-    if (
-      /\b(order|track|tracking|shipping|delivery|don hang|đơn hàng|vận chuyển|giao hàng)\b/i.test(
+    const orderIdMatch =
+      raw.match(/#(\d{1,6})\b/) ??
+      raw.match(
+        /(?:order|đơn(?:\s+hàng)?|don(?:\s+hang)?)\s*(?:id|no\.?|number|số|so|mã|ma)?\s*#?(\d{1,6})(?=\s|$|[.,!?])/i,
+      );
+    const isPurchasePhrase =
+      /\b(?:want to|like to|how to|place an|can i)\s+order\b/i.test(raw) ||
+      /\border\s+\d+\s+[a-z]/i.test(raw);
+    const hasOrderTrackingIntent =
+      !isPurchasePhrase &&
+      (/\b(track|tracking|shipping|delivery|my order|order status|don hang|đơn hàng|vận chuyển|giao hàng)\b/i.test(
         raw,
       ) ||
-      ascii.includes('don hang')
-    ) {
+        ascii.includes('don hang') ||
+        /\border\s*#\d+/i.test(raw));
+
+    if (hasOrderTrackingIntent) {
       toolsInvoked.push('get_order_status');
+      if (!params.userId) {
+        return {
+          message: isVi
+            ? 'Vui lòng đăng nhập vào tài khoản NOCTURNE của bạn để tra cứu trạng thái đơn hàng.'
+            : 'Please sign in to your NOCTURNE account to inspect live order telemetry.',
+          toolsInvoked,
+          uiBlocks,
+          products: [],
+          filters: parsedFilters,
+        };
+      }
+
       const explicitOrderId = orderIdMatch
         ? Number(orderIdMatch[1])
         : undefined;
@@ -384,8 +441,8 @@ export class HybridRagRouterService {
       }
 
       const fallbackMsg = isVi
-        ? 'Vui lòng đăng nhập hoặc nhập mã đơn (ví dụ: "kiểm tra đơn #1") để tra cứu trạng thái vận chuyển.'
-        : 'Sign in or specify your order number (e.g. "Track order #1") to inspect live fulfillment stages.';
+        ? 'Không tìm thấy đơn hàng tương ứng trên tài khoản của bạn. Hãy kiểm tra lại mã đơn (ví dụ: "kiểm tra đơn #1").'
+        : 'No matching order was found on your account. Verify your order number (e.g. "Track order #1") and try again.';
       return {
         message: fallbackMsg,
         toolsInvoked,
@@ -397,7 +454,7 @@ export class HybridRagRouterService {
 
     // 3. Check Voucher / Coupon Validation Intent
     const codeMatch = raw.match(
-      /\b(ENIGMA15|CULT10|VAULT500K|[A-Z]{4,12}\d{1,4})\b/i,
+      /\b(NOCTURNE15|ENIGMA15|CULT10|VAULT500K|[A-Z]{4,12}\d{1,4})\b/i,
     );
     if (
       codeMatch ||
@@ -405,7 +462,7 @@ export class HybridRagRouterService {
         raw,
       )
     ) {
-      const targetCode = codeMatch ? codeMatch[1].toUpperCase() : 'ENIGMA15';
+      const targetCode = codeMatch ? codeMatch[1].toUpperCase() : 'NOCTURNE15';
       toolsInvoked.push('validate_coupon');
       const validation = await this.validateCoupon(targetCode, 3000000);
       const reply = validation.valid
@@ -413,8 +470,8 @@ export class HybridRagRouterService {
           ? `Mã ưu đãi ${targetCode} hợp lệ: ${'description' in validation ? validation.description : ''}. Áp dụng tại bước Checkout để nhận đặc quyền!`
           : `Privilege code ${targetCode} verified — ${'description' in validation ? validation.description : 'active'}. Apply it directly in your bag or checkout.`
         : isVi
-          ? `Mã "${targetCode}" chưa khả dụng (${validation.message}). Mẹo: gõ tổ hợp phím bí mật ENIGMA ngoài khung nhập liệu để mở khóa đặc quyền Inner Circle!`
-          : `Code "${targetCode}" could not be verified (${validation.message}). Hint: type ENIGMA anywhere on the storefront to unlock Inner Circle privilege.`;
+          ? `Mã "${targetCode}" chưa khả dụng (${validation.message}). Mẹo: gõ tổ hợp phím bí mật NOCTURNE ngoài khung nhập liệu để mở khóa đặc quyền Night Order!`
+          : `Code "${targetCode}" could not be verified (${validation.message}). Hint: type NOCTURNE anywhere on the storefront to unlock Night Order privilege.`;
       return {
         message: reply,
         toolsInvoked,
@@ -434,7 +491,7 @@ export class HybridRagRouterService {
         kind: 'taste_codex_prompt',
         title: 'DECODE YOUR TASTE CODEX',
         subtitle:
-          'Complete the 8-step Enigma Initiation to unlock your archival archetype and matched Mystery Chest.',
+          'Complete the 8-step NOCTURNE Initiation to unlock your archival archetype and matched Mystery Chest.',
         currentArchetype: params.styleProfile?.archetype ?? null,
         suggestedTierSlug:
           params.styleProfile?.recommendedTier ?? 'inner-circle-chest',
@@ -485,7 +542,7 @@ export class HybridRagRouterService {
         const cols = products.slice(0, 3).map((p) => ({
           id: p.id,
           name: p.name,
-          brand: p.brand ?? 'ENIGMA ATELIER',
+          brand: p.brand ?? 'NOCTURNE ATELIER',
           category: p.category ?? 'Archive',
           price: Number(p.price),
           releaseType: (p.releaseType ?? 'drop').toUpperCase(),
@@ -526,7 +583,7 @@ export class HybridRagRouterService {
     }
     toolsInvoked.push('search_products_hybrid');
 
-    const { products, scores } = await this.searchProductsHybrid(
+    const { products, scores, strictEmpty } = await this.searchProductsHybrid(
       raw,
       parsedFilters,
       4,
@@ -542,8 +599,8 @@ export class HybridRagRouterService {
         ),
       );
       const reply = isVi
-        ? `Mình tìm thấy ${products.length} thiết kế khớp với yêu cầu của bạn từ kho lưu trữ ENIGMA. Bạn có thể chọn nhanh size và thêm trực tiếp vào giỏ ngay trên thẻ sản phẩm.`
-        : `Curated ${products.length} authenticated pieces from the ENIGMA vault matching your brief. Select your size directly on any card below.`;
+        ? `Mình tìm thấy ${products.length} thiết kế khớp với yêu cầu của bạn từ kho lưu trữ NOCTURNE. Bạn có thể chọn nhanh size và thêm trực tiếp vào giỏ ngay trên thẻ sản phẩm.`
+        : `Curated ${products.length} authenticated pieces from the NOCTURNE vault matching your brief. Select your size directly on any card below.`;
       return {
         message: reply,
         toolsInvoked,
@@ -553,10 +610,34 @@ export class HybridRagRouterService {
       };
     }
 
+    if (strictEmpty) {
+      const constraintNotes: string[] = [];
+      if (parsedFilters.maxPrice !== undefined) {
+        constraintNotes.push(
+          isVi
+            ? `tầm giá dưới ${parsedFilters.maxPrice.toLocaleString('vi-VN')}₫`
+            : `budget under ${parsedFilters.maxPrice.toLocaleString('vi-VN')}₫`,
+        );
+      }
+      if (parsedFilters.size) {
+        constraintNotes.push(`size ${parsedFilters.size}`);
+      }
+      const noteText = constraintNotes.join(' / ');
+      return {
+        message: isVi
+          ? `Hiện chưa có thiết kế nào trong kho lưu trữ NOCTURNE khớp chính xác với bộ lọc (${noteText}). Bạn có thể nới rộng ngân sách hoặc thử size khác để mình tìm lại nhé.`
+          : `No archival pieces in the NOCTURNE vault currently match your exact filter (${noteText}). Try widening your budget or exploring another size.`,
+        toolsInvoked,
+        uiBlocks,
+        products: [],
+        filters: parsedFilters,
+      };
+    }
+
     return {
       message: isVi
-        ? 'Chào mừng đến với ENIGMA Concierge. Bạn có thể yêu cầu tìm sneaker/áo khoác theo tầm giá, so sánh 2 món đồ, xem phiên đấu giá trực tiếp, kiểm tra đơn hàng hoặc xác thực mã ENIGMA15.'
-        : 'Welcome to the ENIGMA Stylist Desk. Ask me to source archival pieces by silhouette or budget, compare grails side-by-side, inspect live auctions, track an order, or decode your style.',
+        ? 'Chào mừng đến với NOCTURNE Concierge. Bạn có thể yêu cầu tìm sneaker/áo khoác theo tầm giá, so sánh 2 món đồ, xem phiên đấu giá trực tiếp, kiểm tra đơn hàng hoặc xác thực mã NOCTURNE15.'
+        : 'Welcome to the NOCTURNE Stylist Desk. Ask me to source archival pieces by silhouette or budget, compare grails side-by-side, inspect live auctions, track an order, or decode your style.',
       toolsInvoked,
       uiBlocks,
       products: [],
